@@ -1,5 +1,3 @@
-# surfari/agents/tools/gmail_tools.py
-
 import os
 import json
 import base64
@@ -498,7 +496,6 @@ async def sheets_create_from_json(title: str, records: List[Dict[str, Any]], she
 TOOLS = [gmail_send_email, gmail_search_emails, gmail_get_message, sheets_read_json, sheets_create_from_json]
 
 if __name__ == "__main__":
-    # Import your gmail_tools module to get sample functions
     from surfari.model.tool_helper import _normalize_tools_for_openai
 
     normalized = _normalize_tools_for_openai(TOOLS)

@@ -3,14 +3,14 @@ import time
 import asyncio
 from typing import Optional, List, Dict, Any
 import surfari.util.surfari_logger as surfari_logger
-from surfari.agents.tools.gmail_tools import gmail_search_emails
+from surfari.agents.tools.google_tools import gmail_search_emails
 
 logger = surfari_logger.getLogger(__name__)
 
 class GmailOTPClientAsync:
     """
-    OTP helper built on top of gmail_tools' high-level functions.
-    - No direct OAuth/HTTP here; we rely on gmail_tools to handle scopes, tokens, retries.
+    OTP helper built on top of google_tools' high-level functions.
+    - No direct OAuth/HTTP here; we rely on google_tools to handle scopes, tokens, retries.
     """
 
     def __init__(self):
@@ -65,7 +65,7 @@ class GmailOTPClientAsync:
         query = self._build_query(from_me=from_me, within_seconds=within_seconds)
         logger.debug(f"[>] Gmail OTP query: {query}")
 
-        # Use the gmail_tools wrapper (handles auth and errors)
+        # Use the google_tools wrapper (handles auth and errors)
         resp = await gmail_search_emails(query=query, max_results=max_results)
         if not resp.get("ok"):
             logger.warning(f"[!] gmail_search_emails failed: {resp.get('error')}")
