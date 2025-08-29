@@ -481,6 +481,10 @@ class NavigationAgent(BaseAgent):
                     self.record_and_replay_manager.save_recording()
             logger.info(f"Total errors: {total_errors}")
             logger.info(f"Final answer: {answer}")
+            
+            if config.CONFIG["app"].get("log_output", "file") == "file":
+                print(f"Final answer: {answer}")
+
         return answer
 
     async def _handle_delegate_to_agent(self, steps: Union[Dict[str, Any], List[Dict[str, Any]]]) -> None:
