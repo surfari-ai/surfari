@@ -38,13 +38,31 @@ dependencies = [
 ]
 
 [tool.setuptools]
-packages = { find = { where = ["."], include = ["surfari*"], exclude = ["surfari.test*"] } }
+package-dir = {"" = "src"}
+packages = { find = { where = ["src"], include = ["surfari*"], exclude = ["surfari.test*"] } }
 
 [tool.setuptools."package-data"]
 surfari = [
     "util/config.json",
-    "view/html_to_text.js",  
+    "view/html_to_text.js",
     "security/.env",
     "security/credentials.db",
     "security/google_client_secret.json"
 ]
+
+[tool.pytest.ini_options]
+# Ensure pytest can find your src/ package
+pythonpath = ["src"]
+# Show nicer test output
+addopts = "-ra -q"
+# Coverage options
+minversion = "6.0"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["src/surfari"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
