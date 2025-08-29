@@ -48,40 +48,40 @@ It enables secure, scriptable, and intelligent interactions with websites — pe
   Surfari can show the LLM’s reasoning and intended action in an **on-page action box overlay** next to the targeted element — making the agent’s decisions transparent, reviewable, and debuggable.
 
 - **Configurable LLM Models (No Coding Required)**  
-  Swap models like OpenAI GPT, Anthropic Claude, Google Gemini, or Ollama local models **just by name** in config — no code changes needed.
+  Swap models like Google Gemini, OpenAI GPT, Anthropic Claude, **just by name** in config — no code changes needed.
 
 - **Information Masking**  
   Automatically masks and unmasks account numbers, balances, and any digit-like strings, ensuring sensitive data remains protected during logs, prompts, and replays.
 
 - **One or Multiple Actions Per Turn**  
-  Choose between **step-by-step interactivity** (safer on dynamic sites) or **multi-action per turn** (faster on static workflows).
+  Choose between **step-by-step interactivity** (safer on dynamic sites) or **multi-action per turn** (faster on static or more predictable sites/workflows).
 
 - **Custom Value Resolvers (Beyond Tool Calling)**  
-  Unknown form values (inputs, select options, etc.) can be resolved automatically via APIs, retrieval-augmented search, or custom resolvers — **without requiring tool calls through the LLM**.
+  Unknown form values (inputs, select options, etc.) can be resolved automatically via direct APIs, retrieval-augmented search, or custom resolvers — **without requiring tool calls through the LLM**.
 
 - **Tool Calling Integration**  
   - **Python Tools:** Easy integration via function calling.  
   - **MCP Tools:** Stdio or HTTP servers supported for external integrations.
 
 - **Screenshots for Grounding**  
-  Use screenshots as additional context for the LLM to ensure accurate reasoning.  
+  Use screenshots as additional context for the LLM to ensure accurate reasoning (a tad slower)
   Supports **saving screenshots** for later review.
 
 - **PDF Download Automation**  
   Downloads PDFs from both **direct download links** and **embedded Chrome PDF viewers**.
 
 - **Batch Execution from CSV**  
-  Run multiple tasks in one batch with different sites, goals, and credentials.
+  Run or schedule multiple tasks in one batch — each task can target a different site, goal, or credential set, with its own settings (e.g., single vs. multi-action per turn, record/replay on/off, masking enabled/disabled, screenshots enabled/disabled).
 
 - **OTP Handling**  
-  Solves text-message based OTPs by forwarding messages into Gmail, then auto-fills them during login.
+  Automatically solves text-message OTPs by setting up SMS forwarding from your phone to your Gmail, then auto-filling them during login.
 
 - **Google Tools Integration**  
   Out-of-the-box support for Gmail, Google Sheets, and Google Docs.
 
 - **Deployment Options**  
-  - **CLI Binaries:** Platform-specific executables — no Python setup required.  
-  - **Docker Deployment:** Cloud mode with VNC-based browser streaming to your web browser.
+  - **CLI Binaries:** Platform-specific executables — no Python setup required. Just download and run.  
+  - **Docker Deployment:** Cloud mode with VNC-based browser streaming. Provision a VM and access the remote browser directly from your web browser.  
 
 ---
 
