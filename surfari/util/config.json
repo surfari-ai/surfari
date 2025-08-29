@@ -1,0 +1,43 @@
+{
+    "app": {
+        "log_level": 20,
+        "log_output": "stdout",
+        "_log_output": "file",
+        "project_log_folder": "logs",
+        "screenshot_folder": "screenshots",
+        "debug_files_folder": "debugfiles",
+        "hil_polling_times": 6000,
+        "max_number_of_turns": 100,
+        "network_max_inflight": 1,
+        "network_idle_quiet_ms": 300,
+        "network_idle_timeout_ms": 10000,
+        "wait_time_heuristic": -1,
+        "console_debug_log_enabled": false,
+        "console_log_visibility_check": false,
+        "generate_locator_disabled": false,
+        "use_system_keyring": false,
+        "browser_width": 1800,
+        "browser_height": 1100,
+        "show_reasoning_box": true,
+        "show_reasoning_box_duration": 1000,
+        "llm_model": "gemini-2.5-flash",
+        "llm_model2": "gpt-5-mini",
+        "llm_model3": "claude-3-5-haiku-latest",
+        "llm_model4": "gemini-2.5-flash-lite",
+        "llm_model5": "gpt-4.1-mini",
+        "llm_model6": "gemma3:12b",
+        "model_costs": {
+            "input": 0.30,
+            "output": 2.50
+        },
+        "use_screenshot": true,
+        "save_screenshot": false,
+        "screenshot_format": "jpeg",
+        "screenshot_quality": 30,
+        "screenshot_full_page": false
+    },
+    "value_resolver": {
+        "target": "surfari.agents.navigation_agent._value_resolver:NoOpResolver",
+        "params": {}
+    }
+}

@@ -1,0 +1,40 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+# Distribution / packaging
+build/
+dist/
+*-dist.zip
+*.egg-info/
+# Virtual environments
+venv/
+.venv/
+# Environment variables and config
+.env_dev*
+credentials_dev*.db
+*token.json
+*client_secret.json
+# Logs
+logs/
+downloads/
+# Playwright temporary profiles
+playwright_chrome_profile/
+# IDEs / editors
+.vscode/
+launch.json
+# macOS
+.DS_Store
+build-steps.txt
+
+bin/
+lib/
+include/
+pyvenv.cfg
+
+surfari.code-workspace
+surfari/tests/*
+surfari/util/credentials_dev.sqbpro
+surfari/util/config_dev*.json
+surfari/util/pdf_downloader.py

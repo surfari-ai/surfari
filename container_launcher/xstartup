@@ -1,0 +1,11 @@
+#!/bin/sh
+
+unset SESSION_MANAGER
+unset DBUS_SESSION_BUS_ADDRESS
+#exec xfce4-session
+#startxfce4 &
+#chromium --no-sandbox &
+export DEST_URL=$(printenv DEST_URL)
+xfwm4 --replace &
+echo "DEST_URL is $DEST_URL" >> /tmp/vnc.log
+chromium --no-sandbox --no-first-run --kiosk --disable-session-crashed-bubble --disable-infobars --remote-debugging-port=9222 --remote-debugging-address=localhost --no-default-browser-check

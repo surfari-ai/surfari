@@ -1,0 +1,4 @@
+run,task_goal,site_name,url,username,password,enable_data_masking,multi_action_per_turn,record_and_replay,rr_use_parameterization,use_screenshot,save_screenshot
+0,"Using expedia to Find tickets from New York to Seattle, two adult passengers and one 14 years old, one 1 year old infant with seat, leaving on first monday of Oct, 2025, 10 days later return date, direct flight or at most 1 stop, Find lowest price.",Expedia,,,,,1,0,1,0,1
+1,How much does gemini 2.5 flash API cost?,,,,,,,,,,
+0,Zelle John $10 for Lunch,Bank of America,,,,,,,,,
