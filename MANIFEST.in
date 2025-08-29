@@ -1,1 +1,2 @@
 prune *.egg-info
+prune tests
