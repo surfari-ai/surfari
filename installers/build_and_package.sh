@@ -41,7 +41,7 @@ else
   fi
 fi
 
-pip install --upgrade pip
+python -m pip install --upgrade pip
 
 echo "📦 Installing dependencies..."
 pip install -e .
