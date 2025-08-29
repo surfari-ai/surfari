@@ -37,13 +37,19 @@ RUN mkdir -p /home/surfari/.vnc
 COPY --chown=surfari:surfari xstartup /home/surfari/.vnc/xstartup
 RUN chmod +x /home/surfari/.vnc/xstartup
 
-# Copy the local zip file into the image
-COPY --chown=surfari:surfari surfari-linux-dist.zip /home/surfari/
+# ------------------------------
+# Pass version at build-time
+# ------------------------------
+ARG SURFARI_VERSION=0.1.5
+ENV SURFARI_VERSION=${SURFARI_VERSION}
+
+# Copy the zip archive into the image
+COPY --chown=surfari:surfari surfari-${SURFARI_VERSION}-linux.zip /home/surfari/
 
 # Unzip it in the container
 RUN set -eux && \
-    unzip -q /home/surfari/surfari-linux-dist.zip -d /home/surfari && \
-    rm /home/surfari/surfari-linux-dist.zip
+    unzip -q /home/surfari/surfari-${SURFARI_VERSION}-linux.zip -d /home/surfari && \
+    rm /home/surfari/surfari-${SURFARI_VERSION}-linux.zip
 
 # Expose ports for HTTP (6901) and WebRTC (8444)
 EXPOSE 6901 8444
