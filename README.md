@@ -25,9 +25,9 @@ It enables secure, scriptable, and intelligent interactions with websites — pe
       participant B as Agent B (Delegated Subtask)
       participant H as Human-in-the-Loop
 
-      A->>A: Start workflow (LLM + Record/Replay)
+      A->>A: Start workflow
       A->>B: Delegate subtask<br/>(new tab/session)
-      B->>B: Complete delegated task<br/>(parameterized replay or LLM)
+      B->>B: Complete delegated task
       B-->>A: Return result, control resumes
 
       A->>A: Continue main workflow
