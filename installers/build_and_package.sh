@@ -7,6 +7,16 @@ cd "$current_dir/.."
 echo "📂 Current working directory: $PWD"
 
 # ------------------------------
+# 0. Read version from pyproject.toml
+# ------------------------------
+VERSION=$(grep -m1 '^version *= *' pyproject.toml | sed -E 's/.*"([^"]+)".*/\1/')
+if [[ -z "$VERSION" ]]; then
+  echo "❌ Could not extract version from pyproject.toml"
+  exit 1
+fi
+echo "📌 Project version: $VERSION"
+
+# ------------------------------
 # 1. Create / Activate venv
 # ------------------------------
 if [ ! -d ".venv" ]; then
@@ -104,9 +114,15 @@ if [ "$include_bundled_chromium" = true ]; then
 fi
 
 # ------------------------------
-# 6. Create installer zip
+# 6. Embed VERSION file in dist
 # ------------------------------
-ARCHIVE_BASENAME="surfari-${OS_SUFFIX}-dist"
+echo "📝 Writing VERSION file inside dist..."
+echo "$VERSION" > dist/navigation_cli/VERSION
+
+# ------------------------------
+# 7. Create installer zip
+# ------------------------------
+ARCHIVE_BASENAME="surfari-${VERSION}-${OS_SUFFIX}"
 ZIP_NAME="${ARCHIVE_BASENAME}.zip"
 
 if [ -f "$ZIP_NAME" ]; then

@@ -17,7 +17,7 @@ playwright_chrome_profile/
 .vscode/
 surfari.code-workspace
 
-*-dist.zip
+*surfari-*.zip
 *token.json
 *secret.json
 launch.json
@@ -26,3 +26,4 @@ build-steps.txt
 pyvenv.cfg
 /tests/*
 *_dev*
+installers/surfari-0.1.5-macos.zip
