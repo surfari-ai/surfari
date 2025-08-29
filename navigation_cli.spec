@@ -1,18 +1,40 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os
+from pathlib import Path
+import tomllib  # Python 3.11+ (use `tomli` for Python 3.10)
+from PyInstaller.utils.hooks import copy_metadata
 
+# --- Load package-data from pyproject.toml ---
+datas = []
+try:
+    with open("pyproject.toml", "rb") as f:
+        pyproject = tomllib.load(f)
+
+    pkg_data = pyproject.get("tool", {}).get("setuptools", {}).get("package-data", {})
+    for pkg, patterns in pkg_data.items():
+        for pattern in patterns:
+            src_path = Path("src") / pkg / pattern  # actual dev location
+            if src_path.exists():
+                target_dir = f"{pkg}/{os.path.dirname(pattern)}"
+                datas.append((str(src_path), target_dir))
+            else:
+                print(f"⚠️ Missing package-data file: {src_path}")
+except Exception as e:
+    print(f"⚠️ Could not parse pyproject.toml for package-data: {e}")
+
+# --- Ensure fastmcp + mcp metadata are bundled ---
+datas += copy_metadata("fastmcp")
+datas += copy_metadata("mcp")
 
 a = Analysis(
-    ['surfari/navigation_cli.py'],
+    ['src/surfari/navigation_cli.py'],
     pathex=[],
     binaries=[],
-    datas=[
-        ('surfari/util/config.json', 'surfari/util'),
-        ('surfari/view/html_to_text.js', 'surfari/view'),
-        ('surfari/security/.env', 'surfari/security'),
-        ('surfari/security/google_client_secret.json', 'surfari/security'),
-        ('surfari/security/credentials.db', 'surfari/security'),
+    datas=datas,
+    hiddenimports=[
+        "fastmcp",
+        "mcp",
     ],
-    hiddenimports=[],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -20,6 +42,7 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
+
 pyz = PYZ(a.pure)
 
 exe = EXE(
@@ -33,18 +56,13 @@ exe = EXE(
     strip=False,
     upx=True,
     console=True,
-    disable_windowed_traceback=False,
-    argv_emulation=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
 )
+
 coll = COLLECT(
     exe,
     a.binaries,
     a.datas,
     strip=False,
     upx=True,
-    upx_exclude=[],
     name='navigation_cli',
 )
