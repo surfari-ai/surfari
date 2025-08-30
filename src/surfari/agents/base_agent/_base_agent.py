@@ -45,10 +45,10 @@ class BaseAgent:
         username = secrets.get("UsernameAssistant")
         password = secrets.get("PasswordAssistant")
         if username:
-            masked_username = f"U{"#" * int(len(username) * uniform(0.8, 1.2))}"
+            masked_username = f"U{'#' * int(len(username) * uniform(0.8, 1.2))}"
         if password:
-            masked_password = f"P{"#" * int(len(password) * uniform(0.8, 1.2))}"
-        
+            masked_password = f"P{'#' * int(len(password) * uniform(0.8, 1.2))}"
+
         if username and password:
             return {username: masked_username, password: masked_password}
         if username:
