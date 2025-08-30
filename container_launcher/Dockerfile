@@ -40,7 +40,7 @@ RUN chmod +x /home/surfari/.vnc/xstartup
 # ------------------------------
 # Pass version at build-time
 # ------------------------------
-ARG SURFARI_VERSION=0.1.5
+ARG SURFARI_VERSION
 ENV SURFARI_VERSION=${SURFARI_VERSION}
 
 # Copy the zip archive into the image
