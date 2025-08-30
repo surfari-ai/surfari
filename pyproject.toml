@@ -7,7 +7,7 @@ name = "surfari"
 version = "0.1.5"
 description = "Surfari: Modular browser automation with LLM"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.11"
 license = "MIT"
 authors = [{ name = "Yonghui Zhang", email = "yonghui.zhang.ca@gmail.com" }]
 classifiers = [
