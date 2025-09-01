@@ -942,8 +942,9 @@ class NavigationAgent(BaseAgent):
         else:
             step["result"] = (
                 f"Error: I cannot interact with '{orig_target}'. "
-                "A valid target must be text enclosed in one or two matching pairs of [ ] or { }, "
-                "and it must end with an optional index (e.g., [Payee]1, {{Amount}}2)."
+                "A valid target must be text enclosed in one or two balanced and matching pairs of [ ] or { }, "
+                "and it must end with an optional numeric index (e.g., [Payee]1, {{Amount}}2). "
+                "Nothing else is allowed before or after."
             )
 
 
