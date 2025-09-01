@@ -8,7 +8,6 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import httpx
 from playwright.async_api import Error, Page, BrowserContext, Response
 from urllib.parse import urlparse, unquote
-from datetime import datetime
 import surfari.util.config as config
 import surfari.util.surfari_logger as surfari_logger
 import surfari.util.playwright_util as playwright_util
@@ -148,7 +147,8 @@ class NavigationAgent(BaseAgent):
                 return base_name
             else:
                 # Fallback to default naming logic
-                pdf_filename = f"downloaded_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+                pdf_filename = f"downloaded_{time.strftime('%Y%m%d_%H%M%S', time.localtime())}.pdf"
+
                 return pdf_filename
             
         async def pdf_response_handler(response: Response) -> None:
