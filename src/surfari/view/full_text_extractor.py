@@ -16,8 +16,6 @@ class WebPageTextExtractor:
 
     ICON_RE = re.compile(r"([^\[\{]*?)([☐✅🔘🟢]\d*)([^\]\}]*?)")
     BRACKET_RE = re.compile(r"^((\[{1,2}[^\[\]\{\}]+]{1,2}|\{{1,2}[^\[\]\{\}]+}{1,2})\d*)$")
-    BRACKETED_PREFIX_PATTERN = re.compile(r'^((\[{1,2}[^\[\]]+\]{1,2}|\{{1,2}[^\{\}]+\}{1,2})\d*)')
-
 
     WHITESPACE_RE = re.compile(r'\s+')
     
@@ -291,12 +289,7 @@ class WebPageTextExtractor:
                 text = match.group(1)
                 logger.sensitive(f"Found bracket match, using text: {text}")
             else:
-                match = self.BRACKETED_PREFIX_PATTERN.match(text)
-                if match:
-                    text = match.group(1)
-                    logger.debug(f"Found bracketed prefix match, using text: {text}")
-                else:
-                    return None, is_expandable_element
+                return None, is_expandable_element
         # when we get here, we have a valid text that is either an radio/checkbox icon or a bracketed text optionally with a number   
         orig_text = self._escape_quotes(text.strip())
         locator   = self.locator_map.get(orig_text)

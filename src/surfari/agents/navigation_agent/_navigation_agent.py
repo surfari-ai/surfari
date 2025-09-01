@@ -45,6 +45,8 @@ from surfari.agents.navigation_agent._prompts import (
 
 logger = surfari_logger.getLogger(__name__)
 
+MULTI_TARGET_PATTERN = re.compile(r'(\[{1,2}[^\[\]]+\]{1,2}|\{{1,2}[^\{\}]+\}{1,2})')
+
 async def _validate_url(url: str) -> str:
     """Return the same URL if valid and reachable, else empty string."""
     logger.info(f"Validating LLM Suggested URL: {url}")
@@ -920,10 +922,31 @@ class NavigationAgent(BaseAgent):
             step["target"] = step["orig_target"]  # type: ignore[assignment]
             del step["orig_target"]
 
-        if not orig_target.startswith("[") and not orig_target.startswith("{") and not any(symbol in orig_target for symbol in ["☐", "✅", "🔘", "🟢"]):
-            step["result"] = f"Error: I can not interact with {orig_target}. An interactable element must start with [ or {{ or is a radio button or checkbox."
+        targets = MULTI_TARGET_PATTERN.findall(orig_target)
+        if len(targets) > 1:
+            target_list = ", ".join(targets)
+            step["result"] = (
+                f"Error: I cannot interact with '{orig_target}'. "
+                f"Multiple targets were detected: {target_list}. "
+                "Do not combine multiple targets in one step. "
+                "Each target must be its own step."
+            )
+        elif not orig_target.startswith("[") and not orig_target.startswith("{") \
+            and not any(symbol in orig_target for symbol in ["☐", "✅", "🔘", "🟢"]):
+            step["result"] = (
+                f"Error: I cannot interact with '{orig_target}'. "
+                "An interactable element must be in the form [ ... ], [[ ... ]], { ... }, or {{ ... }}, "
+                "optionally followed by an index (e.g., [Payee]1, {{Amount}}2), "
+                "or contain a checkbox/radio symbol (☐, ✅, 🔘, 🟢)."
+            )
         else:
-            step["result"] = f"Error: I can not interact with {orig_target}. Do you see the EXACT target in the page? Please double check and make sure correct [ or {{ are used"
+            step["result"] = (
+                f"Error: I cannot interact with '{orig_target}'. "
+                "A valid target must be text enclosed in one or two matching pairs of [ ] or { }, "
+                "and it must end with an optional index (e.g., [Payee]1, {{Amount}}2)."
+            )
+
+
 
         self.chat_history.append({"role": "user", "content": f"{json.dumps(step)}"})
 
