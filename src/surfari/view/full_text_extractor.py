@@ -290,8 +290,12 @@ class WebPageTextExtractor:
                 text = match.group(1)
                 logger.sensitive(f"Found bracket match, using text: {text}")
             else:
-                match = self.BRACKETED_PREFIX_PATTERN.match(text)
+                match = self.BRACKETED_PREFIX_PATTERN.match(text)                
                 if match:
+                    remainder = text[match.end():].strip()
+                    if any(ch in remainder for ch in "[]{}"):
+                        logger.warning(f"Text contains multiple bracketed targets or is malformed: {text}, giving up...")
+                        return None, is_expandable_element
                     text = match.group(1)
                     logger.debug(f"Found bracketed prefix match, using text: {text}")
                 else:
