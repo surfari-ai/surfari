@@ -165,6 +165,7 @@ __agent_delegation_prompt_part__
 - Dismiss popups or modals not relevant to the task
 - Double check data on the page to ensure correct completion of tasks, not just the result of the last action
 - A user feedback "Error:..." or "Wait:..." means you must change your course of action, ***don't repeat the same failed action, DELEGATE_TO_USER after a few failed attempts***
+- History of all previous turns is always provided. If you need to remember something for future turns, explicitly write it into the "reasoning" field of your response.
 ---
 
 __tool_calling_prompt_part__
@@ -172,7 +173,7 @@ __tool_calling_prompt_part__
 📌 FINAL REMINDER
 
 The first user message defines the goal. 
-History of previous turns is provided for context.
+
 """
 
 NAVIGATION_USER_PROMPT = """ 

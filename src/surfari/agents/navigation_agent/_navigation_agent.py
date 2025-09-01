@@ -643,7 +643,7 @@ class NavigationAgent(BaseAgent):
             screenshot_quality = config.CONFIG["app"].get("screenshot_quality", 30)
             screenshot_full_page = config.CONFIG["app"].get("screenshot_full_page", False)
             if save_screenshot:
-                current_time = time.strftime("%H:%M:%S", time.localtime())
+                current_time = time.strftime("%Y%m%d_%H%M%S", time.localtime())                
                 image_data = await page.screenshot(path=os.path.join(config.screenshot_folder_path, f"{current_time}-site_id-{self.site_id}_screenshot.{screenshot_format}"), full_page=screenshot_full_page, type=screenshot_format, quality=screenshot_quality)
             else:
                 image_data = await page.screenshot(full_page=screenshot_full_page, type=screenshot_format, quality=screenshot_quality)

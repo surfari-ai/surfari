@@ -51,7 +51,7 @@ async def log_text_to_file(site_id, text, *args):
     logger = getLogger(__name__)
     if not logger.isEnabledFor(logging.SENSITIVE):
         return
-    current_time = time.strftime("%H:%M:%S", time.localtime())
+    current_time = time.strftime("%Y%m%d_%H%M%S", time.localtime())
     arg0 = args[0] if len(args) > 0 else "navigation"
     arg1 = args[1] if len(args) > 1 else ""
     filename = f"{current_time}_site_id_{site_id}_{arg0}_{arg1}.txt"
