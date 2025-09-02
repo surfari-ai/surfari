@@ -120,7 +120,50 @@ echo "📝 Writing VERSION file inside dist..."
 echo "$VERSION" > dist/navigation_cli/VERSION
 
 # ------------------------------
-# 7. Create installer zip
+# 7. macOS codesign + notarization
+# Refer to: https://gist.github.com/bpteague/750906b9a02094e7389427d308ba1002 for setting up SIGN_ID and NOTARY_PROFILE
+# ------------------------------
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  echo "🔏 Signing and notarizing on macOS..."
+  BIN_PATH="dist/navigation_cli"
+  BIN_EXEC="$BIN_PATH/navigation_cli"
+  PYTHON_FW="$BIN_PATH/_internal/Python.framework"
+
+  SIGN_ID="${SIGN_ID:-Developer ID Application: REPLACE_WITH_YOUR_ID}"
+  NOTARY_PROFILE="${NOTARY_PROFILE:-MyNotaryProfile}"
+
+  if [[ "$SIGN_ID" == "Developer ID Application: REPLACE_WITH_YOUR_ID" ]]; then
+    echo "❌ SIGN_ID is not set. Please export SIGN_ID first."
+    exit 1
+  fi
+
+  # --- Step 7.1: Sign Python.framework internals ---
+  if [ -d "$PYTHON_FW" ]; then
+    echo "📦 Signing Python.framework internals..."
+
+    if [ -f "$PYTHON_FW/Versions/3.12/Python" ]; then
+      codesign --force --options runtime --timestamp --sign "$SIGN_ID" \
+        "$PYTHON_FW/Versions/3.12/Python"
+    fi
+  fi
+  # --- Step 7.2: Notarize the archive ---
+  NOTARIZE_ZIP="$PWD/surfari-${VERSION}-${OS_SUFFIX}.zip"
+  echo "📦 Creating notarization zip: $NOTARIZE_ZIP"
+  ditto -c -k --keepParent "$BIN_PATH" "$NOTARIZE_ZIP"
+
+  echo "🚀 Submitting for notarization (profile: $NOTARY_PROFILE)..."
+  xcrun notarytool submit "$NOTARIZE_ZIP" --keychain-profile "$NOTARY_PROFILE" --wait
+
+  # Move notarized archive into installers/
+  mkdir -p "$PWD/installers"
+  mv "$NOTARIZE_ZIP" "$PWD/installers/"
+  echo "✅ Build complete! Created notarized archive: installers/$(basename "$NOTARIZE_ZIP")"
+
+  exit 0  # Skip step 8 since macOS final zip is already notarized
+fi
+
+# ------------------------------
+# 8. Create final installer zip (non-macOS only)
 # ------------------------------
 ARCHIVE_BASENAME="surfari-${VERSION}-${OS_SUFFIX}"
 ZIP_NAME="${ARCHIVE_BASENAME}.zip"

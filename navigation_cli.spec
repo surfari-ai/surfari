@@ -1,5 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 import os
+import sys
 from pathlib import Path
 import tomllib  # Python 3.11+ (use `tomli` for Python 3.10)
 from PyInstaller.utils.hooks import copy_metadata
@@ -45,18 +46,35 @@ a = Analysis(
 
 pyz = PYZ(a.pure)
 
-exe = EXE(
-    pyz,
-    a.scripts,
-    [],
-    exclude_binaries=True,
-    name='navigation_cli',
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=True,
-    console=True,
-)
+if sys.platform == "darwin":
+    CODESIGN_IDENTITY = os.environ.get("CODESIGN_IDENTITY", None)
+    exe = EXE(
+        pyz,
+        a.scripts,
+        [],
+        exclude_binaries=True,
+        name='navigation_cli',
+        debug=False,
+        bootloader_ignore_signals=False,
+        strip=False,
+        upx=True,
+        console=True,
+        codesign_identity=CODESIGN_IDENTITY,
+        entitlements_file='installers/entitlements.plist'
+    )
+else:
+    exe = EXE(
+        pyz,
+        a.scripts,
+        [],
+        exclude_binaries=True,
+        name='navigation_cli',
+        debug=False,
+        bootloader_ignore_signals=False,
+        strip=False,
+        upx=True,
+        console=True,
+    )
 
 coll = COLLECT(
     exe,

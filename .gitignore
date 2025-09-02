@@ -28,3 +28,4 @@ pyvenv.cfg
 *_dev*
 installers/surfari-0.1.5-macos.zip
 container_launcher/push-docker-hub.sh
+release.txt
