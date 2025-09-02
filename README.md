@@ -87,27 +87,23 @@ pip install .
 ## 🚀 Quick Start
 
 ```python
-from surfari.util.cdp_browser import ChromiumManager
-from surfari.util.surfari_logger import getLogger
-from surfari.agents.navigation_agent import NavigationAgent
 import asyncio
+from dotenv import load_dotenv
+load_dotenv()
 
-logger = getLogger(__name__)
+from surfari.util.cdp_browser import ChromiumManager
+from surfari.agents.navigation_agent import NavigationAgent
 
-async def test_navigation_agent():
+async def main():
    site_name, task_goal = "Expedia", "Find cheapest direct flight ticket from SFO to New York leaving on first week of Nov 2025, returning 10 days later"
-
    manager = await ChromiumManager.get_instance(use_system_chrome=True)
    page = await manager.get_new_page()
-
    nav_agent = NavigationAgent(site_name=site_name, enable_data_masking=False)
    answer = await nav_agent.run(page, task_goal=task_goal)
-
    print("Final answer:", answer)
    await ChromiumManager.stop_instance()
   
-if __name__ == "__main__":
-   asyncio.run(test_navigation_agent())
+asyncio.run(main())
 ```
 
 ---
