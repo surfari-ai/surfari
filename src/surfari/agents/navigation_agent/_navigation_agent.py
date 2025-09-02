@@ -173,7 +173,9 @@ class NavigationAgent(BaseAgent):
 
                     with open(dest_path, "wb") as f:
                         f.write(content)
-                    logger.debug(f"PDF saved to: {dest_path}")
+
+                    self.chat_history.append({"role": "user", "content": f"I downloaded the PDF from {response.url}"})
+                    logger.debug(f"PDF saved to: {dest_path} from url: {response.url} and page.url: {page.url}")
                 except Exception as e:
                     logger.error(f"Failed to save PDF from {response.url}: {e}")
 
@@ -931,8 +933,7 @@ class NavigationAgent(BaseAgent):
                 "Do not combine multiple targets in one step. "
                 "Each target must be its own step."
             )
-        elif not orig_target.startswith("[") and not orig_target.startswith("{") \
-            and not any(symbol in orig_target for symbol in ["☐", "✅", "🔘", "🟢"]):
+        elif not orig_target.startswith("[") and not orig_target.startswith("{") and not any(symbol in orig_target for symbol in ["☐", "✅", "🔘", "🟢"]):
             step["result"] = (
                 f"Error: I cannot interact with '{orig_target}'. "
                 "An interactable element must be in the form [ ... ], [[ ... ]], { ... }, or {{ ... }}, "

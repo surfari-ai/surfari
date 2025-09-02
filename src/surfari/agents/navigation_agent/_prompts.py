@@ -315,7 +315,7 @@ REVIEW_SUCCESS_SYSTEM_PROMPT = f"""
 {ANNOTATION_GUIDE_PART}
 Your job:
 - The assistant has indicated that it has successfully completed the task.
-- Review the history and current page content to determine if the assistant has indeed correctly fulfilled the user's goal.
+- Review the entire chat history and current page content to determine if the assistant has indeed correctly fulfilled the user's goal.
    - Note: pay special attention to the criteria specified in the task goal.
 - Respond ONLY with a valid JSON object with one of two outcomes:
 
