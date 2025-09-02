@@ -19,23 +19,6 @@ It enables secure, scriptable, and intelligent interactions with websites — pe
   A Navigation Agent can **pause its own run and delegate subtasks** to another agent in a separate tab, then resume after the subtask completes.  
   Enables branching workflows, multi-agent collaboration, and parallel subtasks — like a team of agents cooperating inside one browser.
 
-  ```mermaid
-  sequenceDiagram
-      participant A as Agent A (Main Task)
-      participant B as Agent B (Delegated Subtask)
-      participant H as Human-in-the-Loop
-
-      A->>A: Start workflow
-      A->>B: Delegate subtask<br/>(new tab/session)
-      B->>B: Complete delegated task
-      B-->>A: Return result, control resumes
-
-      A->>A: Continue main workflow
-      A-->>H: Request help if blocked<br/>(e.g. CAPTCHA, unknown field)
-      H-->>A: Human resolves and resumes
-      A->>A: Complete task and verify
-  ```
-
 - **Human-in-the-Loop Delegation**  
   When needed, Surfari can gracefully delegate control back to a **human operator**.  
   You complete the missing step in the live browser, then the agent continues the workflow automatically.
