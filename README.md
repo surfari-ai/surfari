@@ -105,6 +105,7 @@ Surfari can be used in two ways:
 1. **Install Surfari**:  
    ```bash
    pip install surfari
+   # optionally install chromium. If chromium is not installed, system Chrome browser will be used.
    python -m playwright install chromium
    ```
 
