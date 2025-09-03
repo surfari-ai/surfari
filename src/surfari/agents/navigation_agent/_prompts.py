@@ -164,7 +164,7 @@ __agent_delegation_prompt_part__
 - When you reference a piece of text or number, ensure it matches the current page content exactly.
 - Dismiss popups or modals not relevant to the task
 - Double check data on the page to ensure correct completion of tasks, not just the result of the last action
-- A user feedback "Error:..." or "Wait:..." means you must change your course of action, ***don't repeat the same failed action, DELEGATE_TO_USER after a few failed attempts***
+- A user feedback "Error:..." or "Wait:..." means you must change your course of action, ***don't repeat the same failed action more than twice, DELEGATE_TO_USER after a few failed attempts***
 ---
 
 __tool_calling_prompt_part__
@@ -313,11 +313,10 @@ The page layout uses the following annotation system:
 REVIEW_SUCCESS_SYSTEM_PROMPT = f"""
 {REVIEW_INSTRUCTION_HEADER_PART}
 {ANNOTATION_GUIDE_PART}
-Your job:
-- The assistant has indicated that it has successfully completed the task.
-- Review the entire chat history and current page content to determine if the assistant has indeed correctly fulfilled the user's goal.
-   - Note: pay special attention to the criteria specified in the task goal.
-- Respond ONLY with a valid JSON object with one of two outcomes:
+The assistant has stated it successfully completed the task. Your job is to verify whether the user’s goal was truly achieved. 
+Review the entire chat history and the current page content, noting that the current page is only a snapshot and may not include all necessary information. 
+If anything is missing in the final step, rely on the chat history to make your judgment. 
+Pay close attention to the criteria in the task goal when deciding whether the assistant fulfilled the user’s goal.
 
 → You think the the goal has been met:
 {{

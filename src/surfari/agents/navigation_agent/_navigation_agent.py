@@ -656,7 +656,7 @@ class NavigationAgent(BaseAgent):
                 image_data = None        
         
         if image_data:
-            user_prompt += "\n[Screenshot of the page is also provided for reference]"
+            user_prompt += "\n[Screenshot of the page is also provided for reference. Only use the annotated elements for interaction targets]"
 
 
             

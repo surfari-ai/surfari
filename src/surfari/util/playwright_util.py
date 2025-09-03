@@ -769,10 +769,25 @@ async def get_main_scrollable_locator(page) -> Tuple[Locator, Dict]:
 async def highlight_elements(page, elements, color="red", duration=500):
     """Highlight elements with a colored outline"""
     for element in elements:
-        await element.evaluate(f"el => el.style.outline = '3px solid {color}'")
+        await element.evaluate(
+            """(el, color) => {
+                // Store original outline and apply highlight
+                el.dataset.originalOutline = el.style.outline || '';
+                el.style.outline = `3px solid ${color}`;
+            }""",
+            color,
+        )
+    # Wait for the specified duration
     await page.wait_for_timeout(duration)
+    # Restore the original outline styles
     for element in elements:
-        await element.evaluate("el => el.style.outline = ''")
+        await element.evaluate(
+            """el => {
+                const original = el.dataset.originalOutline || '';
+                el.style.outline = original;
+                delete el.dataset.originalOutline;
+            }"""
+        )
 
 async def show_reasoning_box(page, locator_or_box = None, reasoning: str = "", show_reasoning_box_duration: int = 2000):
     """

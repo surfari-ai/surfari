@@ -432,23 +432,13 @@ class WebPageTextExtractor:
         logger.debug(f"Processed {number_of_duplicates} duplicate text content...")        
         return '\n'.join(modified_lines), new_legend_dict
 
-    def truncate_xpath_to_interactive(self, full_xpath):
-        segments = [seg for seg in full_xpath.split('/') if seg.strip()]
-        last_interactive = -1
-        for i in range(len(segments) - 1, -1, -1):
-            if segments[i].startswith(('a[', 'button')) or segments[i] == 'a':
-                last_interactive = i
-                break
-        if last_interactive == -1:
-            return full_xpath
-        return '/' + '/'.join(segments[:last_interactive + 1])
-
     def locate_element_with_xpath(self, page, xpath):
         """
         Locates an element using the given XPath, handling iframe boundaries if present.
         Uses `page.frame_locator` for iframe handling.
         """
-        xpath = self.truncate_xpath_to_interactive(xpath)
+        # remove the last svg component as it always fails (svg in different namespace)
+        xpath = re.sub(r'/svg(?:\[\d+\])?$', '', xpath)
         if '/iframe' in xpath:
             iframe_xpath, remaining_xpath = xpath.split('/iframe[', 1)
             iframe_xpath += '/iframe[' + remaining_xpath.split(']', 1)[0] + ']'

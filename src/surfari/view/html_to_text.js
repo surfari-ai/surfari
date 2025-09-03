@@ -364,9 +364,8 @@ function hasSizedChildIncludingShadow(el, tooSmall = 2) {
         const node = stack.pop();
 
         if (node !== el && node instanceof Element) {
-            const w = node.offsetWidth;
-            const h = node.offsetHeight;
-            if (w + h > tooSmall * 2) return true;
+            const rect = node.getBoundingClientRect();
+            if (rect.width + rect.height > tooSmall * 2) return true;
         }
 
         // Traverse light DOM
@@ -425,7 +424,7 @@ function isVisible(node, checkHasSizedChild = true, checkHiddenByModal = true) {
         }
         debugLog(message);
         if (withSizeLog && rect) {
-            debugLog(`rect: ${JSON.stringify(rect)}, offsetWidth: ${el.offsetWidth}, offsetHeight: ${el.offsetHeight}`);
+            debugLog(`rect: ${JSON.stringify(rect)}`);
         }
     }
 
@@ -464,9 +463,8 @@ function isVisible(node, checkHasSizedChild = true, checkHiddenByModal = true) {
     const tag = el.tagName.toLowerCase();
     const isRadioOrCheckbox = tag === "input" && (el.type === "radio" || el.type === "checkbox");
     const rect = el.getBoundingClientRect();
-    const isSizeNonZero = true; //el.offsetWidth > 0 || el.offsetHeight > 0 || rect.width > 0 || rect.height > 0;
 
-    if (isRadioOrCheckbox && isSizeNonZero) {
+    if (isRadioOrCheckbox) {
         logVisibleInfo("Assume visible: Element is radio/checkbox with non-zero size", false, true);
         return true;
     }
@@ -488,17 +486,9 @@ function isVisible(node, checkHasSizedChild = true, checkHiddenByModal = true) {
         return false;
     }
 
-    physicallyTooSmall =
-        el.offsetWidth <= TOO_SMALL &&
-        el.offsetHeight <= TOO_SMALL &&
-        rect.width <= TOO_SMALL &&
-        rect.height <= TOO_SMALL;
-
-    physicallyTooSmall = physicallyTooSmall ||
-        el.offsetWidth === 0 ||
-        el.offsetHeight === 0 ||
-        rect.width === 0 ||
-        rect.height === 0;
+    physicallyTooSmall = (rect.width <= TOO_SMALL && rect.height <= TOO_SMALL);
+    physicallyTooSmall = physicallyTooSmall || (rect.width === 0 || rect.height === 0);
+    physicallyTooSmall = physicallyTooSmall || (tag === "iframe" && rect.width <= 24 && rect.height <= 24);
 
     const horizontallyOffscreen =
         rect.right <= 0 ||
@@ -805,18 +795,18 @@ function getElementInteractiveLevel(el) {
         }
         const accessibleText = title + " " + ariaLabel + " " + textContent;
 
-        if (containsKeyword(["expand", "open"], accessibleText)) {
+        if (containsKeyword(["expand"], accessibleText)) {
             return EXPANDABLE;
         } else if (containsKeyword(["close", "remove", "delete"], accessibleText)) {
             return REMOVABLE;
-        } else if (containsKeyword(["increase", "increment", "add", "inc"], accessibleText)) {
-            return INCREMENT;
-        } else if (containsKeyword(["decrease", "decrement", "reduce", "subtract", "dec"], accessibleText)) {
-            return DECREMENT;
         } else if (containsKeyword(["previous", "back"], accessibleText)) {
             return PREVIOUS;
         } else if (containsKeyword(["next", "forward"], accessibleText)) {
             return NEXT;
+        } else if (containsKeyword(["increase", "increment", "add", "inc"], accessibleText)) {
+            return INCREMENT;
+        } else if (containsKeyword(["decrease", "decrement", "reduce", "subtract", "dec"], accessibleText)) {
+            return DECREMENT;            
         }
         return CLICKABLE;
     } else if (el.classList &&
@@ -1281,7 +1271,8 @@ function traverse(node) {
                 }
             }
             if (!hasVisibleText) { // icon or svg or other buttons/anchors without text
-                debugLog("Empty button/anchor: " + node.tagName + ", id: " + node.id + ", aria-label: " + node.ariaLabel + ", title: " + node.title);
+                debugLog(`Empty button/anchor: ${node.outerHTML.substring(0, 100)}`);
+
                 if (node.hasAttribute('disabled')) return;
                 const fallbackValue = node.getAttribute("value") || "";
 
@@ -1332,18 +1323,20 @@ function traverse(node) {
                     });
                     debugLog(`Empty button/anchor: getLabelText result: "${labelText}"`);
                 }
-                addSegment({
-                    type: 'text',
-                    content: content,
-                    enclose: 0,
-                    x: elementNodeRec.left,
-                    y: elementNodeRec.top,
-                    width: elementNodeRec.width,
-                    height: elementNodeRec.height,
-                    xpath: generateXPathJSInline(node),
-                    locatorString: generateLocator(node),
-                    labelText: labelText
-                });
+                if (node.getAttribute('aria-hidden')?.toLowerCase() !== 'true') {
+                    addSegment({
+                        type: 'text',
+                        content: content,
+                        enclose: 0,
+                        x: elementNodeRec.left,
+                        y: elementNodeRec.top,
+                        width: elementNodeRec.width,
+                        height: elementNodeRec.height,
+                        xpath: generateXPathJSInline(node),
+                        locatorString: generateLocator(node),
+                        labelText: labelText
+                    });
+                }
                 return;
             }
         } else if (
