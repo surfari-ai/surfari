@@ -68,43 +68,82 @@ It enables secure, scriptable, and intelligent interactions with websites — pe
 
 ---
 
-## 📦 Installation
+## 🚀 Quick Start
 
-```bash
-pip install surfari
-```
-
-Or from source:
-
-```bash
-git clone https://github.com/surfari-ai/surfari.git
-cd surfari
-pip install .
-```
+Surfari can be used in two ways:  
+1. **Directly via the prebuilt CLI** (no Python setup needed)  
+2. **From Python code** (full flexibility in your own scripts)  
 
 ---
 
-## 🚀 Quick Start
+### Option 1: Run the CLI
 
-```python
-import asyncio
-from dotenv import load_dotenv
-load_dotenv()
+1. **Download** the prebuilt CLI zip for your platform (Linux, Windows, macOS) from the [Surfari Releases page](https://github.com/surfari-ai/surfari/releases).  
+2. **Unzip** the archive.  
+3. **Open a terminal / command prompt** and change into the `navigation_cli` folder.  
+4. **Set your API key environment variable** (example: Gemini):  
+   ```bash
+   export GEMINI_API_KEY=your_api_key_here   # macOS / Linux
+   set GEMINI_API_KEY=your_api_key_here      # Windows CMD
+   ```  
+   > Other supported keys:  
+   > - `OPENAI_API_KEY` for OpenAI GPT models  
+   > - `ANTHROPIC_API_KEY` for Anthropic Claude models  
+5. **Check the CLI help**:  
+   ```bash
+   ./navigation_cli --help        # macOS / Linux
+   navigation_cli.exe --help      # Windows
+   ```  
+6. **Adjust configuration (optional):**  
+   - Edit `_internal/surfari/util/config.json`, **or**  
+   - Pass overrides with command-line arguments.  
 
-from surfari.util.cdp_browser import ChromiumManager
-from surfari.agents.navigation_agent import NavigationAgent
+---
 
-async def main():
-   site_name, task_goal = "Expedia", "Find cheapest direct flight ticket from SFO to New York leaving on first week of Nov 2025, returning 10 days later"
-   manager = await ChromiumManager.get_instance(use_system_chrome=True)
-   page = await manager.get_new_page()
-   nav_agent = NavigationAgent(site_name=site_name, enable_data_masking=False)
-   answer = await nav_agent.run(page, task_goal=task_goal)
-   print("Final answer:", answer)
-   await ChromiumManager.stop_instance()
-  
-asyncio.run(main())
-```
+### Option 2: Run from Python
+
+1. **Install Surfari**:  
+   ```bash
+   pip install surfari
+   python -m playwright install chromium
+   ```
+
+2. **Set your API key** as above (`GEMINI_API_KEY`, `OPENAI_API_KEY`, or `ANTHROPIC_API_KEY`).  
+   You can also put it in a `.env` file and load it with `dotenv`.  
+
+3. **Write a script** (example below uses Expedia):  
+   ```python
+   import asyncio
+   from dotenv import load_dotenv
+   load_dotenv()  # load .env file if present
+
+   from surfari.util.cdp_browser import ChromiumManager
+   from surfari.agents.navigation_agent import NavigationAgent
+
+   async def main():
+       site_name = "Expedia"
+       task_goal = "Find cheapest direct flight ticket from SFO to New York leaving on first week of Nov 2025, returning 10 days later"
+
+       manager = await ChromiumManager.get_instance(use_system_chrome=True)
+       page = await manager.get_new_page()
+
+       nav_agent = NavigationAgent(site_name=site_name, enable_data_masking=False)
+       answer = await nav_agent.run(page, task_goal=task_goal)
+
+       print("Final answer:", answer)
+       await ChromiumManager.stop_instance()
+
+   asyncio.run(main())
+   ```
+
+4. **Run your script**:  
+   ```bash
+   python my_script.py
+   ```
+
+5. **Switch models (optional):**  
+   ```python
+   nav_agent = NavigationAgent(site_name="Expedia", model="gpt-5-mini")  # uses OPENAI_API_KEY
 
 ---
 
