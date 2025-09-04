@@ -237,8 +237,8 @@ class NavigationAgent(BaseAgent):
     async def run(self, page: Page = None, task_goal: str = "View statements and tax forms") -> str:
         # Set up the download listener
         if not page:
-            chromium_manager = await BrowserManager.get_instance()
-            page = await chromium_manager.get_new_page()
+            browser_manager = await BrowserManager.get_instance()
+            page = await browser_manager.get_new_page()
             
         self.add_donot_mask_terms_from_string(task_goal)
 
@@ -672,17 +672,29 @@ class NavigationAgent(BaseAgent):
                 image_data = None        
         
         if image_data:
-            user_prompt += "\n[Screenshot of the page is also provided for reference. Only use the annotated elements for interaction targets]"
+            user_prompt += "\n**Screenshot of the page is also provided for reference. Only use the annotated elements for interaction targets**"
+
+        purpose = purpose or self.name
+        if purpose.startswith("ReviewNavigationExecution"):
+            chat_history_to_llm = self.chat_history[:-1] if self.chat_history else []
+            last_assistant_msg = self.chat_history[-1]["content"] if self.chat_history else ""
+            user_prompt = (
+                f"{user_prompt}\n\n"
+                "**The following is the assistant’s latest response:**\n"
+                f"{last_assistant_msg}"
+            )
+        else:
+            chat_history_to_llm = self.chat_history
 
         return await self.llm_client.process_prompt_return_json(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
-            chat_history=self.chat_history,
+            chat_history=chat_history_to_llm,
             image_data=image_data,
             image_format=screenshot_format,
             tools=self.tools,
             model=model or self.model,
-            purpose=purpose or self.name,
+            purpose=purpose,
             site_id=self.site_id,
         )
 

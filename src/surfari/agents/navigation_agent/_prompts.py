@@ -164,7 +164,7 @@ __agent_delegation_prompt_part__
 - When you reference a piece of text or number, ensure it matches the current page content exactly.
 - Dismiss popups or modals not relevant to the task
 - Double check data on the page to ensure correct completion of tasks, not just the result of the last action
-- A user feedback "Error:..." or "Wait:..." means you must change your course of action, ***don't repeat the same failed action more than twice, DELEGATE_TO_USER after a few failed attempts***
+- A user feedback "Error:..." or "Wait:..." means you must change your course of action, **don't repeat the same failed action more than twice, DELEGATE_TO_USER after a few failed attempts**
 ---
 
 __tool_calling_prompt_part__
@@ -306,6 +306,7 @@ You are a web navigation expert helping an automated navigation assistant.
 You will be given:
 1. A user task goal and history of the assistant's actions and feedback from the user.
 2. The current textual layout of a web page.
+3. The assistant's latest interpretation of that page content.
 
 The page layout uses the following annotation system:
 """
@@ -316,9 +317,10 @@ REVIEW_SUCCESS_SYSTEM_PROMPT = f"""
 Your job:
 - The assistant has stated it successfully completed the task. Your job is to assess the success criteria and verify whether the user’s goal was truly achieved.
 - The page layout represents the current state of the navigation flow and may not reflect all the steps the assistant has gone through.
+- The assistant’s last message is its interpretation of the page content (sometimes literal, sometimes distilled to match the task goal). When judging success, you should prioritize this interpretation, while still considering the page snapshot and full history.
 - It is important you consider the entire interaction history and the assistant's latest actions addressing review feedbacks, if any.
 - Respond ONLY with a valid JSON object with one of two outcomes:
-→ You think the the goal has been met:
+→ You think the goal has been met:
 {{
    "review_decision": "Goal Met",
    "review_feedback": "The current information indicates that the goal has been met."
