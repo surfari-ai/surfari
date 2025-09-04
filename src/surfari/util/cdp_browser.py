@@ -87,8 +87,8 @@ init_script_text = """
 })();
 """
 
-class ChromiumManager:
-    _instance: ClassVar[Optional["ChromiumManager"]] = None
+class BrowserManager:
+    _instance: ClassVar[Optional["BrowserManager"]] = None
     _instance_lock: ClassVar[asyncio.Lock] = asyncio.Lock()
 
     def __init__(
@@ -117,7 +117,7 @@ class ChromiumManager:
         self.logger.info(f"Browser instance initialized with Screen resolution: {screen_width}x{screen_height}")
 
     @classmethod
-    async def get_instance(cls, use_system_chrome=False) -> "ChromiumManager":
+    async def get_instance(cls, use_system_chrome=True) -> "BrowserManager":
         async with cls._instance_lock:
             if cls._instance is None:
                 cls._instance = cls(use_system_chrome=use_system_chrome)
@@ -140,13 +140,13 @@ class ChromiumManager:
         return page
 
     async def __aenter__(self):
-        raise RuntimeError("Use ChromiumManager.get_instance() instead of context manager.")
+        raise RuntimeError("Use BrowserManager.get_instance() instead of context manager.")
 
     async def __aexit__(self, *args):
         pass
 
     async def start(self) -> None:
-        self.logger.info("Starting ChromiumManager...")
+        self.logger.info("Starting BrowserManager...")
         await self._install_signal_handlers()
         if not self.running_in_container():
             await self._launch_browser()
@@ -154,9 +154,9 @@ class ChromiumManager:
 
     async def stop(self) -> None:
         if self.stopped:
-            self.logger.info("ChromiumManager already stopped.")
+            self.logger.info("BrowserManager already stopped.")
             return
-        self.logger.info("Stopping ChromiumManager and marking as stopped.")
+        self.logger.info("Stopping BrowserManager and marking as stopped.")
         self.stopped = True
         await self._close_browser_context()
         await self._shutdown_browser()

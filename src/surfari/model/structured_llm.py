@@ -11,7 +11,6 @@ from google import genai
 from google.genai import types
 from anthropic import Anthropic
 import base64
-import re
 
 from surfari.model.tool_helper import (
     _normalize_tools_for_openai,

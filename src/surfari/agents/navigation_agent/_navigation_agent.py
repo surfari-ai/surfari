@@ -12,7 +12,7 @@ import surfari.util.config as config
 import surfari.util.surfari_logger as surfari_logger
 import surfari.util.playwright_util as playwright_util
 import surfari.view.text_layouter as text_layouter
-from surfari.util.cdp_browser import ChromiumManager
+from surfari.util.cdp_browser import BrowserManager
 from surfari.security.gmail_otp_fetcher import GmailOTPClientAsync
 from surfari.security.site_credential_manager import SiteCredentialManager
 from surfari.view.full_text_extractor import WebPageTextExtractor
@@ -46,6 +46,14 @@ from surfari.agents.navigation_agent._prompts import (
 logger = surfari_logger.getLogger(__name__)
 
 MULTI_TARGET_PATTERN = re.compile(r'(\[{1,2}[^\[\]]+\]{1,2}|\{{1,2}[^\{\}]+\}{1,2})')
+
+async def detect_browser_from_page(page):
+    version = await page.context.browser.version()
+    if "Chrome" in version:
+        return "chrome"
+    elif "Chromium" in version:
+        return "chromium"
+    return "unknown"
 
 async def _validate_url(url: str) -> str:
     """Return the same URL if valid and reachable, else empty string."""
@@ -226,8 +234,12 @@ class NavigationAgent(BaseAgent):
         logger.debug("Merged tools: %s", [getattr(f, "tool_name", getattr(f, "__name__", None)) for f in self.tools])
         
 
-    async def run(self, page: Page, task_goal: str = "View statements and tax forms") -> str:
+    async def run(self, page: Page = None, task_goal: str = "View statements and tax forms") -> str:
         # Set up the download listener
+        if not page:
+            chromium_manager = await BrowserManager.get_instance()
+            page = await chromium_manager.get_new_page()
+            
         self.add_donot_mask_terms_from_string(task_goal)
 
         await self._merge_tools()  # now self.tools is the merged list
@@ -397,7 +409,7 @@ class NavigationAgent(BaseAgent):
                         continue  # to next turn
                     
                     if step_execution == "DELEGATE_TO_AGENT":
-                        await self._handle_delegate_to_agent(steps)
+                        await self._handle_delegate_to_agent(page, steps)
                         continue  # to next turn
 
                 if not involve_user:
@@ -493,7 +505,7 @@ class NavigationAgent(BaseAgent):
 
         return answer
 
-    async def _handle_delegate_to_agent(self, steps: Union[Dict[str, Any], List[Dict[str, Any]]]) -> None:
+    async def _handle_delegate_to_agent(self, page: Page, steps: Union[Dict[str, Any], List[Dict[str, Any]]]) -> None:
         """Handle delegation to another navigation agent."""
         # Normalize to a list
         steps_list: List[Dict[str, Any]] = steps if isinstance(steps, list) else [steps]
@@ -529,7 +541,9 @@ class NavigationAgent(BaseAgent):
 
             logger.info(f"Delegating to {target} with value: {value}")
             # Reuse same browser context so cookies/session carry over
-            manager = await ChromiumManager.get_instance(use_system_chrome=False)
+            use_system_chrome = detect_browser_from_page(page) == "chrome"
+            manager = await BrowserManager.get_instance(use_system_chrome=use_system_chrome)
+            
             context: BrowserContext = manager.browser_context
 
             page: Optional[Page] = None

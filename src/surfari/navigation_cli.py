@@ -6,7 +6,7 @@ import sys  # Added for system exit
 
 import surfari.util.config as config
 from surfari.security.site_credential_manager import SiteCredentialManager
-from surfari.util.cdp_browser import ChromiumManager
+from surfari.util.cdp_browser import BrowserManager
 from surfari.agents.navigation_agent import NavigationAgent
 
 import surfari.util.surfari_logger as surfari_logger
@@ -61,7 +61,7 @@ async def run_single_task(
         cred_manager.save_credentials(site_name=site_name, url=url, username=username, password=password)
         logger.info(f"[{site_name}] Credentials saved")
 
-    manager = await ChromiumManager.get_instance(use_system_chrome=use_system_chrome)
+    manager = await BrowserManager.get_instance(use_system_chrome=use_system_chrome)
     await asyncio.sleep(1)
     page = await manager.get_new_page()
     logger.info("Successfully got a new page")
@@ -180,7 +180,7 @@ async def main():
         logger.critical("Browser was forcefully closed. Stopping all processes.", exc_info=True)
         sys.exit(1)
     finally:
-        await ChromiumManager.stop_instance()
+        await BrowserManager.stop_instance()
 
 
 if __name__ == "__main__":
