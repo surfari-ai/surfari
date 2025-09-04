@@ -304,7 +304,7 @@ OUTPUT:
 REVIEW_INSTRUCTION_HEADER_PART = """
 You are a web navigation expert helping an automated navigation assistant.
 You will be given:
-1. A user task goal and history of the assistant's actions.
+1. A user task goal and history of the assistant's actions and feedback from the user.
 2. The current textual layout of a web page.
 
 The page layout uses the following annotation system:
@@ -313,11 +313,11 @@ The page layout uses the following annotation system:
 REVIEW_SUCCESS_SYSTEM_PROMPT = f"""
 {REVIEW_INSTRUCTION_HEADER_PART}
 {ANNOTATION_GUIDE_PART}
-The assistant has stated it successfully completed the task. Your job is to verify whether the user’s goal was truly achieved. 
-Review the entire chat history and the current page content, noting that the current page is only a snapshot and may not include all necessary information. 
-If anything is missing in the final step, rely on the chat history to make your judgment. 
-Pay close attention to the criteria in the task goal when deciding whether the assistant fulfilled the user’s goal.
-
+Your job:
+- The assistant has stated it successfully completed the task. Your job is to assess the success criteria and verify whether the user’s goal was truly achieved.
+- The page layout represents the current state of the navigation flow and may not reflect all the steps the assistant has gone through.
+- It is important you consider the entire interaction history and the assistant's latest actions addressing review feedbacks, if any.
+- Respond ONLY with a valid JSON object with one of two outcomes:
 → You think the the goal has been met:
 {{
    "review_decision": "Goal Met",

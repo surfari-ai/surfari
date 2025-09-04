@@ -474,7 +474,12 @@ async def take_actions(page, locator_actions, num_steps=1, reasoning=None) -> li
             logger.warning(f"{action_name}: No value provided for {action}.")
             locator_action["result"] = "Error: No value provided"
             continue
-
+        
+        if action == "click" and target.strip().startswith("{{"):
+            logger.warning(f"{action_name}: Target '{target}' is a select element, which is not supported for click actions. Skipping.")
+            locator_action["result"] = (f"Error: Target '{target}' is a select element; please use 'select' action and specify a value.")
+            continue
+        
         try:
             if isinstance(locator, str):
                 element = eval(locator)

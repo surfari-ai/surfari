@@ -120,7 +120,9 @@ class NavigationAgent(BaseAgent):
         self.agent_delegation_site_list: List[Dict[str, Any]] = agent_delegation_site_list or []
         self.tabs: List[Page] = []
         self.pdf_file_detected = False
-        
+        self.review_iteration_count = 0
+        self.max_review_iterations = config.CONFIG["app"].get("review_success_iterations", 1)
+
         super().__init__(model=model, site_id=site_id, name=name, enable_data_masking=enable_data_masking)
 
     async def _setup_download_listener(self, page: Page) -> None:
@@ -658,8 +660,6 @@ class NavigationAgent(BaseAgent):
         if image_data:
             user_prompt += "\n[Screenshot of the page is also provided for reference. Only use the annotated elements for interaction targets]"
 
-
-            
         return await self.llm_client.process_prompt_return_json(
             system_prompt=system_prompt,
             user_prompt=user_prompt,
@@ -885,11 +885,16 @@ class NavigationAgent(BaseAgent):
 
     async def _verify_task_success_response(self, page: Page, page_layout: str) -> bool:
         """Handle task success response."""
+        if self.review_iteration_count >= self.max_review_iterations:
+            logger.info("Max review iterations has been reached.")
+            return True  # Assume success to avoid infinite loop
+        
         review_decision, review_feedback = await self._review_navigation_execution(
             page=page,
             system_prompt=REVIEW_SUCCESS_SYSTEM_PROMPT,
             user_prompt=NAVIGATION_USER_PROMPT.format(page_content=page_layout),
         )
+        self.review_iteration_count += 1
         if review_decision == "Goal Met":
             logger.info("SUCCESS: After review, task has been completed successfully.")
             return True
