@@ -114,27 +114,22 @@ Surfari can be used in two ways:
 
 3. **Write a script** (example below uses Expedia):  
    ```python
-   import asyncio
-   from dotenv import load_dotenv
-   load_dotenv()  # load .env file if present
+  import asyncio
+  from dotenv import load_dotenv
+  load_dotenv()  # load .env file if present
 
-   from surfari.util.cdp_browser import BrowserManager
-   from surfari.agents.navigation_agent import NavigationAgent
+  from surfari.agents.navigation_agent import NavigationAgent
 
-   async def main():
-       site_name = "Expedia"
-       task_goal = "Find cheapest direct flight ticket from SFO to New York leaving on first week of Nov 2025, returning 10 days later"
+  async def main():
+      site_name = "Expedia"
+      task_goal = "Find cheapest direct flight ticket from SFO to New York leaving on first week of Nov 2025, returning 10 days later"
 
-       manager = await BrowserManager.get_instance(use_system_chrome=True)
-       page = await manager.get_new_page()
+      nav_agent = NavigationAgent(site_name=site_name)
+      answer = await nav_agent.run(task_goal=task_goal)
 
-       nav_agent = NavigationAgent(site_name=site_name, enable_data_masking=False)
-       answer = await nav_agent.run(page, task_goal=task_goal)
+      print("Final answer:", answer)
 
-       print("Final answer:", answer)
-       await BrowserManager.stop_instance()
-
-   asyncio.run(main())
+  asyncio.run(main())
    ```
 
 4. **Run your script**:  
