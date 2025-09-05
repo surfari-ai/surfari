@@ -631,13 +631,23 @@ function computeLabel(node, qs, getById) {
 
 // Root-scoped accessible-name computation
 function computeName(el) {
-    let text = null;
+    let text = "";
     const alt = el.getAttribute('alt')?.trim();
     if (alt) text = alt;
 
     if (!text) {
         const title = el.getAttribute('title')?.trim();
         if (title) text = title;
+    }
+    if (!text) {
+        const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+        while (walker.nextNode()) {
+            const textNode = walker.currentNode;
+            const trimmed = textNode.textContent.trim();
+            if (!trimmed) continue;
+            if (textNode.parentElement?.closest('[aria-hidden="true"]')) continue;
+            text += (text ? " " : "") + trimmed;
+        }
     }
 
     if (!text) {
@@ -1256,7 +1266,7 @@ function traverse(node) {
                 return;
             }
         }
-        if (elementRole === 'button' || elementRole === 'link' || elementRole === 'option' || 
+        if (elementRole === 'button' || elementRole === 'link' || elementRole === 'option' ||
             node.tagName.toLowerCase() === 'button' || node.tagName.toLowerCase() === 'a' ||
             node.tagName.toLowerCase() === 'img' || node.tagName.toLowerCase() === 'svg') {
 
@@ -1264,9 +1274,9 @@ function traverse(node) {
             if (isRectObscured(elementNodeRec, node)) return;
             let content;
             const interaLevel = getInteractiveLevelClimb(node);
-            let hasVisibleText = false;
-            // checks visible text elements inside. If there are visible texts, let traversal to children happen
-            // sometimes there could be multiple fragmented text nodes for presentation purposes, they will each be annotated
+            let visibleText = "";
+
+            // collect all visible text nodes under this node
             const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
             while (walker.nextNode()) {
                 const textNode = walker.currentNode;
@@ -1277,12 +1287,13 @@ function traverse(node) {
                 }
                 const parentEl = textNode.parentElement;
                 if (isVisibleCheckCached(parentEl) && !isFontIcon(parentEl)) {
-                    hasVisibleText = true;
-                    break;
+                    visibleText += (visibleText ? " " : "") + trimmed;
                 } else {
                     __alreadyProcessedNodes.add(textNode);
                 }
             }
+
+            const hasVisibleText = visibleText.length > 0;
             if (!hasVisibleText) { // icon or svg or other buttons/anchors without text
                 debugLog(`Empty button/anchor: ${node.outerHTML.substring(0, 100)}`);
 
@@ -1351,6 +1362,21 @@ function traverse(node) {
                         labelText: labelText
                     });
                 }
+                return;
+            } else if (node.tagName.toLowerCase() === 'a' && !node.querySelector("img, svg, input")) {
+                // use the combined visible text for anchors without nested images/icons/inputs and be done with it
+                content = visibleText;
+                addSegment({
+                    type: 'text',
+                    content: content,
+                    enclose: 1,
+                    x: elementNodeRec.left,
+                    y: elementNodeRec.top,
+                    width: elementNodeRec.width,
+                    height: elementNodeRec.height,
+                    xpath: generateXPathJSInline(node),
+                    locatorString: generateLocator(node)
+                });
                 return;
             }
         } else if (

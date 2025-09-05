@@ -123,6 +123,8 @@ class WebPageTextExtractor:
                         text_content = f"[[{seg['content']}]]"         
                     else: text_content = f"[{seg['content']}]"
 
+                    text_content = re.sub(r"\s+", " ", text_content)
+
                     labelText = seg.get("labelText", None)
                     if labelText:
                         # logger.trace(f"Adding labelText to legend_dict for {seg['content']}: {labelText} with combined_xpath={combined_xpath}")
