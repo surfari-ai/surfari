@@ -1,5 +1,5 @@
 const PARENT_LAYER_UP = 10;
-const TOO_SMALL = 1;
+const TOO_SMALL = 4;
 const NON_INTERACTIVE = 0;
 const CLICKABLE = 1;
 const EXPANDABLE = 2;
@@ -357,7 +357,7 @@ function hasVisibleChild(node) {
     return false;
 }
 
-function hasSizedChildIncludingShadow(el, tooSmall = 2) {
+function hasSizedChildIncludingShadow(el) {
     const stack = [el];
 
     while (stack.length) {
@@ -365,7 +365,7 @@ function hasSizedChildIncludingShadow(el, tooSmall = 2) {
 
         if (node !== el && node instanceof Element) {
             const rect = node.getBoundingClientRect();
-            if (rect.width + rect.height > tooSmall * 2) return true;
+            if (rect.width + rect.height > TOO_SMALL * 2) return true;
         }
 
         // Traverse light DOM
@@ -486,7 +486,7 @@ function isVisible(node, checkHasSizedChild = true, checkHiddenByModal = true) {
         return false;
     }
 
-    physicallyTooSmall = (rect.width <= TOO_SMALL && rect.height <= TOO_SMALL);
+    physicallyTooSmall = (rect.width + rect.height <= TOO_SMALL * 2);
     physicallyTooSmall = physicallyTooSmall || (rect.width === 0 || rect.height === 0);
     physicallyTooSmall = physicallyTooSmall || (tag === "iframe" && rect.width <= 24 && rect.height <= 24);
 
@@ -793,7 +793,19 @@ function getElementInteractiveLevel(el) {
         if (role === "button") {
             textContent = el.textContent.trim();
         }
-        const accessibleText = title + " " + ariaLabel + " " + textContent;
+        let labelledbyText = "";
+        const ariaLabelledBy = el.getAttribute('aria-labelledby');
+        if (ariaLabelledBy) {
+            labelledbyText = ariaLabelledBy
+                .split(/\s+/)
+                .map(id => document.getElementById(id))
+                .filter(el => el) // avoid nulls
+                .map(el => el.innerText.trim())
+                .filter(Boolean)
+                .join(" ");
+        }
+
+        const accessibleText = title + " " + ariaLabel + " " + textContent + " " + labelledbyText;
 
         if (containsKeyword(["expand"], accessibleText)) {
             return EXPANDABLE;
@@ -952,14 +964,15 @@ function getLabelText(node, { includeSiblingLabel = false,
     // 4) aria-labelledby — use element.innerText instead of direct text
     if (!labelText && includeAriaLabelledBy) {
         const ariaLabelledBy = node.getAttribute('aria-labelledby');
+        debugLog(`Checking aria-labelledby for ${node.tagName}, id: ${nodeId}, aria-labelledby: ${ariaLabelledBy}`);
         if (ariaLabelledBy) {
             labelText = ariaLabelledBy
-                .split(/\s+/)                           // multiple IDs allowed
+                .split(/\s+/)
                 .map(id => document.getElementById(id))
-                .filter(el => el && isVisibleCheckCached(el))
+                .filter(el => el) // avoid nulls
                 .map(el => el.innerText.trim())
-                .filter(txt => txt)                    // drop empties
-                .join(' ');
+                .filter(Boolean)
+                .join(" ");
         }
     }
 
@@ -1317,6 +1330,7 @@ function traverse(node) {
                     debugLog(`Empty button/anchor: Used <svg aria-label> for labelText: "${labelText}"`);
                 } else {
                     labelText = getLabelText(node, {
+                        includeAriaLabelledBy: true,
                         includeAriaLabel: true,
                         includeTitle: true,
                         includeTextContent: true
