@@ -828,7 +828,7 @@ function getElementInteractiveLevel(el) {
         } else if (containsKeyword(["increase", "increment", "add", "inc"], accessibleText)) {
             return INCREMENT;
         } else if (containsKeyword(["decrease", "decrement", "reduce", "subtract", "dec"], accessibleText)) {
-            return DECREMENT;            
+            return DECREMENT;
         }
         return CLICKABLE;
     } else if (el.classList &&
@@ -1275,8 +1275,9 @@ function traverse(node) {
             let content;
             const interaLevel = getInteractiveLevelClimb(node);
             let visibleText = "";
+            let lastParentTag = null;
+            const FORMATTING_TAGS = new Set(["B", "I", "U", "EM", "STRONG", "SUB", "SUP", "SMALL", "MARK"]);
 
-            // collect all visible text nodes under this node
             const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
             while (walker.nextNode()) {
                 const textNode = walker.currentNode;
@@ -1287,7 +1288,10 @@ function traverse(node) {
                 }
                 const parentEl = textNode.parentElement;
                 if (isVisibleCheckCached(parentEl) && !isFontIcon(parentEl)) {
-                    visibleText += (visibleText ? " " : "") + trimmed;
+                    const needSpace = visibleText && !FORMATTING_TAGS.has(lastParentTag);
+                    visibleText += (needSpace ? " " : "") + trimmed;
+                    // update last parent tag for the next iteration
+                    lastParentTag = parentEl?.tagName.toUpperCase() || null;
                 } else {
                     __alreadyProcessedNodes.add(textNode);
                 }
@@ -1348,7 +1352,7 @@ function traverse(node) {
                     });
                     debugLog(`Empty button/anchor: getLabelText result: "${labelText}"`);
                 }
-                if (node.getAttribute('aria-hidden')?.toLowerCase() !== 'true') {
+                if (!node.closest('[aria-hidden="true"]')) {
                     addSegment({
                         type: 'text',
                         content: content,
@@ -1363,8 +1367,8 @@ function traverse(node) {
                     });
                 }
                 return;
-            } else if (node.tagName.toLowerCase() === 'a' && !node.querySelector("img, svg, input")) {
-                // use the combined visible text for anchors without nested images/icons/inputs and be done with it
+            } else if ((elementRole === 'option' || node.tagName.toLowerCase() === 'a') && !node.querySelector("input")) {
+                // use the combined visible text for anchors/options if they don't have nested inputs
                 content = visibleText;
                 addSegment({
                     type: 'text',
