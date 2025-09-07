@@ -480,7 +480,7 @@ class NavigationAgent(BaseAgent):
                     )
                     total_errors = self._process_locator_action_results(locator_actions, total_errors)
 
-            answer = f"{str(reasoning)}: {str(answer)}" if answer else str(reasoning)
+            answer = f"{str(reasoning)}:\n ===================\n {str(answer)}" if answer else str(reasoning)
         except Exception:
             logger.exception("Error during navigation")
             answer = "Error occurred. Please check the logs for details."

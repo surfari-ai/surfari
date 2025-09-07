@@ -678,8 +678,8 @@ function generateLocator(node, opts = {}) {
 
     function buildFramePrefix() {
         if (!myFrameId && !myFrameName) return 'page';
-        if (myFrameId) return `page.frame_locator('iframe[id=${myFrameId}]')`;
-        if (myFrameName) return `page.frame_locator('iframe[name=${myFrameName}]')`;
+        if (myFrameId) return `page.frame_locator('iframe[id="${myFrameId}"]')`;
+        if (myFrameName) return `page.frame_locator('iframe[name="${myFrameName}"]')`;
     }
 
     let pg = 'page';
