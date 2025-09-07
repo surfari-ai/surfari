@@ -879,6 +879,14 @@ class NavigationAgent(BaseAgent):
             self.chat_history.append({"role": "user", "content": "I went back to the previous page."})
             return True
 
+        if step_execution == "RELOAD":
+            await playwright_util.show_reasoning_box(page, locator_or_box=None, reasoning=reasoning, show_reasoning_box_duration=show_reasoning_box_duration)
+            logger.info("RELOAD: Reloading the page.")
+            await asyncio.sleep(show_reasoning_box_duration / 1000)
+            await page.reload(timeout=60000)
+            self.chat_history.append({"role": "user", "content": "I reloaded the page."})
+            return True
+
         if step_execution == "DISMISS_MODAL":
             await playwright_util.show_reasoning_box(page, locator_or_box=None, reasoning=reasoning, show_reasoning_box_duration=show_reasoning_box_duration)
             logger.info("Dismissing modal.")

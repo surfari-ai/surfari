@@ -117,6 +117,12 @@ __step_execution_example_part__
   "reasoning": "I need to return to the previous page to view another account."
 }}
 
+→ You need to reload the page to see updates:
+{{
+  "step_execution": "RELOAD",
+  "reasoning": "I need to reload the page to see the latest updates after my last action."
+}}
+
 → A tab was opened by mistake, doesn't contain relevant information or you are done using it. Close it and go back to previous tab to continue (use this instead of BACK)
 {{
   "step_execution": "CLOSE_CURRENT_TAB",
@@ -149,7 +155,7 @@ __agent_delegation_prompt_part__
 - Return only valid JSON (no plain text outside the JSON)
 - Use double quotes only; escape quotes inside values
 - Valid actions: "click", "fill", "select", "check", "uncheck", "scroll". They must be paired with a target because they are applicable to page elements.
-- When returning "SUCCESS", "WAIT", "BACK", "DISMISS_MODAL", "DELEGATE_TO_USER", "CLOSE_CURRENT_TAB", they must be set in step_execution and response must not contain any step and/or actions.
+- When returning "SUCCESS", "WAIT", "BACK", "RELOAD", "DISMISS_MODAL", "DELEGATE_TO_USER", "CLOSE_CURRENT_TAB", they must be set in step_execution and response must not contain any step and/or actions.
 - Never guess or hallucinate targets. Use only annotated ones as shown
 - Target text must match exactly, including casing, spacing, brackets and indexes if any
 - One target per action. Target, reasoning, answer must all be strings, not lists
