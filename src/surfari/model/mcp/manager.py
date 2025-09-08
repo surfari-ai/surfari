@@ -2,7 +2,7 @@
 import asyncio
 from typing import Dict, Optional, List, Any, Callable, Union
 
-from surfari.model.mcp.types import MCPServerInfo, MCPTool, MCPResource, MCPCallResult
+from surfari.model.mcp.mcp_types import MCPServerInfo, MCPTool, MCPResource, MCPCallResult
 from surfari.model.mcp.session import MCPHTTPClientSession, MCPStdioFastMCPClientSession
 
 # Unified session type (both share the same public API)

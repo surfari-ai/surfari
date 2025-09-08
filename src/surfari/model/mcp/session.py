@@ -3,7 +3,7 @@ import time
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Callable, Tuple
 
-from surfari.model.mcp.types import MCPTool, MCPResource, MCPCallResult, MCPServerInfo
+from surfari.model.mcp.mcp_types import MCPTool, MCPResource, MCPCallResult, MCPServerInfo
 
 # stdio transport
 from fastmcp.client.transports import StdioTransport

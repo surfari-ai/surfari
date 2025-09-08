@@ -6,7 +6,7 @@ import jsonschema
 import time
 
 from surfari.model.mcp.manager import MCPClientManager
-from surfari.model.mcp.types import MCPTool, MCPCallResult
+from surfari.model.mcp.mcp_types import MCPTool, MCPCallResult
 from surfari.util import surfari_logger as _surfari_logger
 
 logger = _surfari_logger.getLogger(__name__)
@@ -51,19 +51,39 @@ def _jsonschema_to_gemini(schema: Dict[str, Any]) -> Dict[str, Any]:
 def _fn_name(server_id: str, tool_name: str) -> str:
     return f"mcp__{server_id.translate(SAFE_NAME)}__{tool_name.translate(SAFE_NAME)}"
 
-def _reverse_name(fn_name: str) -> Tuple[str, str]:
-    if not fn_name.startswith("mcp__"):
-        raise ValueError("Not an MCP tool fn name")
-    _, rest = fn_name.split("mcp__", 1)
-    server_id, tool_name = rest.split("__", 1)
-    return server_id, tool_name
 
 class MCPToolRegistry:
     def __init__(self, manager: MCPClientManager):
         self.manager = manager
         self._by_fn: Dict[str, Tuple[str, MCPTool]] = {}
+        self._closed = False
 
+    # ---- lifecycle ---------------------------------------------------------
+    async def aclose(self) -> None:
+        """Async cleanup: close underlying MCP sessions."""
+        if self._closed:
+            return
+        try:
+            await self.manager.aclose()
+        finally:
+            self._closed = True
+
+    def close(self) -> None:
+        """Sync wrapper for aclose(). Safe to call from non-async contexts."""
+        if self._closed:
+            return
+        _run_sync(self.aclose())
+
+    async def __aenter__(self) -> "MCPToolRegistry":
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb) -> None:
+        await self.aclose()
+
+    # ---- existing API (refresh/execute/etc.) ------------------------------
     async def refresh(self, server_ids: Optional[List[str]] = None) -> None:
+        if self._closed:
+            raise RuntimeError("MCPToolRegistry is closed")
         self._by_fn.clear()
         targets = server_ids or list(self.manager._sessions.keys())
         for sid in targets:
