@@ -6,7 +6,7 @@ import os
 import asyncio
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import httpx
-from playwright.async_api import Error, Page, BrowserContext, Response
+from playwright.async_api import Error, Page, BrowserContext, Response, FileChooser
 from urllib.parse import urlparse, unquote
 import surfari.util.config as config
 import surfari.util.surfari_logger as surfari_logger
@@ -163,7 +163,7 @@ class NavigationAgent(BaseAgent):
 
                 return pdf_filename
             
-        async def pdf_response_handler(response: Response) -> None:
+        async def handle_pdf_response(response: Response) -> None:
             ctype = (response.headers.get("content-type") or "").lower()
             dispo = (response.headers.get("content-disposition") or "").lower()
             
@@ -189,12 +189,10 @@ class NavigationAgent(BaseAgent):
                 except Exception as e:
                     logger.error(f"Failed to save PDF from {response.url}: {e}")
 
-
         # Attach handlers
         page.on("download", handle_download)
-        page.on("response", pdf_response_handler)
+        page.on("response", handle_pdf_response)
 
-        
     async def _setup_popup_listener(self, page: Page) -> None:
         async def handle_popup(new_page: Page):
             try:
@@ -202,6 +200,7 @@ class NavigationAgent(BaseAgent):
                 self.tabs.append(new_page)
                 await self._setup_download_listener(new_page)
                 await self._setup_popup_listener(new_page)
+                await self._setup_filechooser_listener(new_page, config.CONFIG["app"].get("file_upload_path", ""))
                 self.current_working_tab = new_page
                 logger.info(f"Popup detected, appended newly opened new tab with URL: {new_page.url} and set up listeners.")
             except Exception as e:
@@ -209,6 +208,46 @@ class NavigationAgent(BaseAgent):
         
         # Attach the handler
         page.on("popup", handle_popup)
+        
+    async def _setup_filechooser_listener(self, page: Page, file_path: str):
+        """Attach a persistent filechooser handler to a Page."""
+        async def handle_filechooser(file_chooser: FileChooser, file_path: str, timeout: int = 10000):
+            el = file_chooser.element
+
+            # Collect some attributes for debugging
+            attrs = await el.evaluate("""el => ({
+                tag: el.tagName,
+                id: el.id || null,
+                name: el.getAttribute('name'),
+                type: el.getAttribute('type'),
+                ariaLabel: el.getAttribute('aria-label'),
+                classes: el.className
+            })""")
+
+            logger.debug(
+                "[FileChooser] Chooser opened: "
+                f"Tag={attrs['tag']}, id={attrs['id']}, name={attrs['name']}, "
+                f"type={attrs['type']}, aria-label={attrs['ariaLabel']}, class={attrs['classes']}"
+            )
+
+            async with file_chooser.page.expect_request_finished(timeout=timeout) as req_info:
+                await file_chooser.set_files(file_path)
+
+            logger.debug(f"[FileChooser] File set: {file_path}")
+
+            try:
+                req = await req_info.value
+                logger.debug(f"[FileChooser] First network request after set_files: {req.url}")
+            except Exception:
+                logger.debug("[FileChooser] No network request detected (maybe upload is deferred)")
+
+            try:
+                await file_chooser.page.wait_for_load_state("networkidle", timeout=timeout)
+                logger.debug("[FileChooser] Network idle — upload likely finished")
+            except Exception:
+                logger.debug("[FileChooser] Network did not go idle within timeout")
+                 
+        page.on("filechooser", lambda fc: handle_filechooser(fc, file_path))       
         
     async def _merge_tools(self) -> None:
         merged = list(self._native_tools)
@@ -269,6 +308,8 @@ class NavigationAgent(BaseAgent):
         logger.info("Before turns, setting up download and popup listeners...")
         await self._setup_download_listener(page)
         await self._setup_popup_listener(page)
+        await self._setup_filechooser_listener(page, config.CONFIG["app"].get("file_upload_path", ""))
+        
         self.tabs = [page]  # start tab tracking at the initial page
         self.current_working_tab = page
 

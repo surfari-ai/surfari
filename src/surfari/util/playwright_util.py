@@ -558,6 +558,10 @@ async def take_actions(page, locator_actions, num_steps=1, reasoning=None) -> li
 
             elif action == "fill":
                 await element.click(timeout=2000, force=True)
+                if not await element.is_visible():
+                    logger.error(f"{action_name}: Element is not visible after clicking. Skipping fill.")
+                    locator_action["result"] = "Warning: Element is no longer visible after clicking. Please re-evaluate based on current page content."
+                    continue
                 tag_name = await element.evaluate("el => el.tagName", timeout=2000)
                 if tag_name and tag_name.lower() == "td":
                     # customization for handsontable                    

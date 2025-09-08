@@ -338,7 +338,7 @@ function isHiddenByAnyModal(node, rect = null) {
 
 
 function customHidden(node) {
-    if (node.classList && (node.classList.contains('ng-binding') || node.classList.contains('completed-questionnaire'))) {
+    if (node.classList.contains('completed-questionnaire')) {
         return true;
     }
     return false;

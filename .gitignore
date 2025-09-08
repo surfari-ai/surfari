@@ -26,6 +26,8 @@ build-steps.txt
 pyvenv.cfg
 /tests/*
 *_dev*
-installers/surfari-0.1.5-macos.zip
+installers/surfari-*.zip
 container_launcher/push-docker-hub.sh
 release.txt
+*.docx
+*.pdf
