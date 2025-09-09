@@ -18,17 +18,15 @@ class _BaseMCPClientSession(ABC):
       - connection lifecycle (subclasses implement connect())
       - shared RPC implementations against FastMCPClient
       - capability caching
-      - normalized responses + timeouts
+      - normalized responses + per-call timeouts (only if provided)
     """
 
-    def __init__(self, progress_cb: Optional[Callable[[int, int, str], None]] = None,
-                 *, default_timeout_s: float = 10.0) -> None:
+    def __init__(self, progress_cb: Optional[Callable[[int, int, str], None]] = None) -> None:
         self.progress_cb = progress_cb
         self._client: Optional[FastMCPClient] = None
         self._tools: List[MCPTool] = []
         self._resources: List[MCPResource] = []
         self._cap_lock = asyncio.Lock()
-        self._default_timeout_s = float(default_timeout_s)
 
     # ----- lifecycle --------------------------------------------------------
     @abstractmethod
@@ -76,7 +74,7 @@ class _BaseMCPClientSession(ABC):
 
     async def _rpc_call_tool(self, name: str, args: Dict[str, Any]) -> Any:
         client = self._ensure_connected()
-        # No inner wait_for: timeouts are enforced in call_tool()
+        # No inner wait_for: timeouts are enforced in call_tool() when provided
         return await client.call_tool(name, args)
 
     # ----- normalization helpers -------------------------------------------
@@ -136,6 +134,7 @@ class _BaseMCPClientSession(ABC):
 
     # ----- capabilities cache + public API ---------------------------------
     async def refresh_capabilities(self) -> None:
+        logger.debug("Refreshing MCP capabilities by rpc...")
         async with self._cap_lock:
             try:
                 self._tools = self._norm_tools(await self._rpc_list_tools())
@@ -173,11 +172,12 @@ class _BaseMCPClientSession(ABC):
     ) -> MCPCallResult:
         start = time.monotonic()
         try:
-            logger.debug("Calling tool '%s' (timeout=%s) args=%s", name, timeout_s, arguments)
             coro = self._rpc_call_tool(name, arguments or {})
-            effective = self._default_timeout_s if timeout_s is None else float(timeout_s)
-            # ⬇️ key change: no create_task — wrap the coroutine directly
-            result = await (asyncio.wait_for(coro, timeout=effective) if effective else coro)
+            logger.debug("Calling tool '%s' (timeout=%s) args=%s", name, timeout_s, arguments)
+            if timeout_s and timeout_s > 0:
+                result = await asyncio.wait_for(coro, timeout=timeout_s)
+            else:
+                result = await coro
 
             data = getattr(result, "data", None)
             return MCPCallResult(
@@ -186,13 +186,9 @@ class _BaseMCPClientSession(ABC):
                 elapsed_ms=int((time.monotonic() - start) * 1000),
             )
         except asyncio.TimeoutError:
-            return MCPCallResult(ok=False, error=f"Timed out after {effective}s")
+            return MCPCallResult(ok=False, error=f"Timed out after {timeout_s}s")
         except Exception as e:
             return MCPCallResult(ok=False, error=str(e))
-
-    async def _rpc_call_tool(self, name: str, args: Dict[str, Any]) -> Any:
-        client = self._ensure_connected()
-        return await client.call_tool(name, args)
 
     # optional hook for progress
     def _on_progress(self, current: int, total: int, message: str):
@@ -209,9 +205,8 @@ class MCPStdioFastMCPClientSession(_BaseMCPClientSession):
     """
 
     def __init__(self, command: str, args: List[str],
-                 cwd: Optional[str] = None, env: Optional[dict] = None,
-                 *, default_timeout_s: float = 10.0) -> None:
-        super().__init__(progress_cb=None, default_timeout_s=default_timeout_s)
+                 cwd: Optional[str] = None, env: Optional[dict] = None) -> None:
+        super().__init__(progress_cb=None)
         self._transport = StdioTransport(command=command, args=args, cwd=cwd, env=env)
 
     async def connect(self) -> None:
@@ -227,8 +222,8 @@ class MCPHTTPClientSession(_BaseMCPClientSession):
     HTTP/SSE-backed session using FastMCPClient(url).
     """
 
-    def __init__(self, url: str, *, default_timeout_s: float = 10.0) -> None:
-        super().__init__(progress_cb=None, default_timeout_s=default_timeout_s)
+    def __init__(self, url: str) -> None:
+        super().__init__(progress_cb=None)
         self.url = url
 
     async def connect(self) -> None:

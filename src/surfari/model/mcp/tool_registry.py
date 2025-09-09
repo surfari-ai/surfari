@@ -65,6 +65,7 @@ class MCPToolRegistry:
 
     # ---- existing API (refresh/execute/etc.) ------------------------------
     async def refresh(self, server_ids: Optional[List[str]] = None) -> None:
+        logger.debug("MCPToolRegistry refreshing...")
         if self._closed:
             raise RuntimeError("MCPToolRegistry is closed")
         self._by_fn.clear()
@@ -113,41 +114,37 @@ class MCPToolRegistry:
 
     def as_async_python_proxy_tools(self) -> list[Callable[..., Any]]:
         """
-        Return async wrappers for each MCP tool.
-        Usage:
+        Return async wrappers for each MCP tool as a **list** so callers can
+        concatenate with other tool lists.
+
+        Example:
             await registry.refresh()
             tools = registry.as_async_python_proxy_tools()
-            res = await tools_by_name["mcp__filesystem__read_file"](path="...")
+            by_name = {t.tool_name: t for t in tools}
+            res = await by_name["mcp__filesystem__read_file"](path="...")
 
         Each wrapper accepts optional `_timeout_s=<float>` to override per-call timeout.
         """
-        funcs: list[Callable[..., Any]] = []
+        out: list[Callable[..., Any]] = []
 
         for fn_name, (_, mcp_tool) in self._by_fn.items():
             schema = mcp_tool.input_schema or {"type": "object", "properties": {}, "additionalProperties": True}
 
             def make_wrapper(bound_name: str, bound_schema: dict, bound_tool: MCPTool):
                 async def _mcp_proxy(**kwargs):
-                    # optional per-call override: pass _timeout_s in kwargs if needed
                     timeout = kwargs.pop("_timeout_s", None)
-                    try:
-                        if bound_schema:
-                            jsonschema.validate(instance=kwargs, schema=bound_schema)
-                    except Exception as e:
-                        return {"ok": False, "error": f"Schema validation failed: {e}"}
-                    t0 = time.perf_counter()
+                    logger.debug("MCP proxy %s called with args=%s, timeout=%s", bound_name, kwargs, timeout)
                     res: MCPCallResult = await self.execute(bound_name, kwargs, timeout_s=timeout)
-                    dt = (time.perf_counter() - t0) * 1000
-                    logger.debug("MCP proxy %s finished in %.1f ms (ok=%s)", bound_name, dt, getattr(res, "ok", None))                    
                     if res.ok:
+                        # ensure JSON-serializable
                         try:
                             json.dumps(res.data)
                             return res.data
                         except Exception:
                             return json.loads(json.dumps(res.data, default=lambda o: repr(o)))
-                    else:
-                        return {"ok": False, "error": res.error}
+                    return {"ok": False, "error": res.error}
 
+                # Helpful metadata for introspection / adapters
                 setattr(_mcp_proxy, "tool_name", bound_name)
                 _mcp_proxy.__doc__ = (bound_tool.description or f"MCP tool '{bound_name}'")[:512]
                 _mcp_proxy.__annotations__ = {k: Any for k in (bound_schema.get("properties") or {}).keys()}
@@ -156,9 +153,9 @@ class MCPToolRegistry:
                 _mcp_proxy.__mcp_tool__ = bound_tool
                 return _mcp_proxy
 
-            funcs.append(make_wrapper(fn_name, schema, mcp_tool))
-        return funcs
+            out.append(make_wrapper(fn_name, schema, mcp_tool))
 
+        return out
 
     async def execute(self, fn_name: str, arguments: Dict[str, Any] | None = None, timeout_s: Optional[float] = None) -> MCPCallResult:
         if fn_name not in self._by_fn:
@@ -170,13 +167,21 @@ class MCPToolRegistry:
 
         server_id, tool = self._by_fn[fn_name]
         args = arguments or {}
-        if tool.input_schema:
-            try:
-                jsonschema.validate(instance=args, schema=tool.input_schema)
-            except Exception as e:
-                return MCPCallResult(ok=False, error=f"Schema validation failed: {e}")
-        logger.debug(f"Calling MCP tool '{tool.name}' on server '{server_id}' with args: {args}")
-        return await self.manager.call_tool(server_id, tool.name, args, timeout_s)
+
+        schema = tool.input_schema or {"type": "object", "properties": {}, "additionalProperties": True}
+        try:
+            jsonschema.validate(instance=args, schema=schema)
+        except Exception as e:
+            return MCPCallResult(ok=False, error=f"Schema validation failed: {e}")
+
+        logger.debug("Delegating to MCPClientManager to call '%s' on server '%s' with args=%s timeout=%s",
+                    tool.name, server_id, args, timeout_s)
+        t0 = time.perf_counter()
+        result = await self.manager.call_tool(server_id, tool.name, args, timeout_s)
+        dt = (time.perf_counter() - t0) * 1000
+        logger.debug("Call to MCP tool '%s' finished in %.1f ms", tool.name, dt)
+        return result
+
 
     def has(self, fn_name: str) -> bool:
         return fn_name in self._by_fn

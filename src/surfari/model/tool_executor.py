@@ -213,6 +213,7 @@ async def _execute_single(
             # Run sync function in a thread to allow cancellation via timeout
             logger.debug(f"Tool {name} is sync")
             loop = asyncio.get_running_loop()
+            # uses the loop’s default ThreadPoolExecutor by passing None
             return await loop.run_in_executor(None, lambda: func(**kwargs))
         except Exception as e:
             logger.debug("\n" + traceback.format_exc())
@@ -220,8 +221,10 @@ async def _execute_single(
 
     try:
         if timeout and timeout > 0:
+            logger.debug(f"Will run tool {name} with id={call.id} with a timeout {timeout}s")
             result = await asyncio.wait_for(_run(), timeout=timeout)
         else:
+            logger.debug(f"Will run tool {name} with id={call.id} without a timeout")
             result = await _run()
         return ToolResult(id=call.id, name=name, ok=True, result=result)
     except asyncio.TimeoutError:
