@@ -2,8 +2,6 @@ from datetime import datetime, timezone
 from typing import List, Dict, Any, Union
 import hashlib
 import json
-import asyncio
-
 import surfari.util.db_service as db_service
 import surfari.util.config as config
 import surfari.util.surfari_logger as surfari_logger
@@ -250,34 +248,4 @@ class RecordReplayManager:
         normalized = text.strip().encode("utf-8")
         return hashlib.sha256(normalized).hexdigest()[:16]
 
-
-# Example usage
-if __name__ == "__main__":
-    # Parameterize
-    #task_description = "Find tickets from Boston to Seattle, leaving on August 10, 2025, 5 days later return date, direct flight or at most 1 stop, Find flights under $500."
-    task_description = "no parameter necessary for 13 days"
-    rr_manager = RecordReplayManager(task_description=task_description, site_id=9999, site_name="Unknown Site")    
-
-    loaded_recording = asyncio.run(rr_manager.attempt_load_recorded_chat_history())
-    
-    print(f"Loaded recording: {loaded_recording}")
-    # Save
-    if not loaded_recording:
-        rr_manager.recorded_chat_history = [
-            {"role": "user", "content": "Find tickets..."}, 
-            {"role": "assistant", "content": "Here are your five options..."}
-        ]
-        rr_manager.recorded_history_variables = rr_manager.current_variables
-        new_id = rr_manager.save_recording()
-        print(f"Inserted task_id={new_id}")
-        asyncio.run(rr_manager.attempt_load_recorded_chat_history())
-    print("Fetched history", json.dumps(rr_manager.recorded_chat_history, indent=2, ensure_ascii=False))
-    print("Fetched history variables", json.dumps(rr_manager.recorded_history_variables, indent=2, ensure_ascii=False))
-    print("Fetched current variables", json.dumps(rr_manager.current_variables, indent=2, ensure_ascii=False))
-    print("Fetched task description:", rr_manager.task_description)
-    print("Fetched parameterized task description:", rr_manager.parameterized_task_desc)
-    print("Fetched task hash:", rr_manager.task_hash)
-    print("Fetched parameterized task hash:", rr_manager.parameterized_task_hash)
-    print("Fetched site ID:", rr_manager.site_id)
-    print("Fetched site name:", rr_manager.site_name)
 

@@ -42,8 +42,6 @@ async def wait_for_page_load_generic(page, timeout_ms=1000, post_load_timeout_ms
         timeout_ms: Max time to wait in milliseconds.
         post_load_timeout_ms: Final buffer after load.
     """
-    import asyncio
-    import time
     start_time = time.time()
     try:
         # 1. Wait for 'load' event

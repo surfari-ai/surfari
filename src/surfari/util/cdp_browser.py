@@ -273,7 +273,6 @@ class BrowserManager:
             self.logger.info("Stopping Playwright...")
             await self.playwright.stop()
             self.playwright = None
-        # await asyncio.sleep(3)
 
     async def _shutdown_browser(self) -> None:
         self.logger.info("Shutting down browser called.")
@@ -283,7 +282,6 @@ class BrowserManager:
                 if self.chrome_process.returncode is None:
                     self.logger.info("Waiting for browser to terminate gracefully...")
                     self.chrome_process.terminate()
-                    # await asyncio.wait_for(self.chrome_process.wait(), timeout=self.shutdown_timeout)
                     self.logger.info("Browser terminated gracefully.")
                 else:
                     self.logger.info("Browser already terminated with exit code: %d", self.chrome_process.returncode)

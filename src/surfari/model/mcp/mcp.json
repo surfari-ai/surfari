@@ -1,8 +1,10 @@
 {
     "servers": {
         "filesystem": {
-            "command": "mcp-server-filesystem",
+            "command": "python3",
             "args": [
+                "-m",
+                "surfari.model.mcp.fs_server",
                 "."
             ]
         }

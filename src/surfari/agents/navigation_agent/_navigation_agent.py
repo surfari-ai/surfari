@@ -13,12 +13,14 @@ import surfari.util.surfari_logger as surfari_logger
 import surfari.util.playwright_util as playwright_util
 import surfari.view.text_layouter as text_layouter
 from surfari.util.cdp_browser import BrowserManager
+from surfari.util.async_bridge import run_sync
 from surfari.security.gmail_otp_fetcher import GmailOTPClientAsync
 from surfari.security.site_credential_manager import SiteCredentialManager
 from surfari.view.full_text_extractor import WebPageTextExtractor
 from surfari.agents import BaseAgent
 from surfari.agents.navigation_agent._record_and_replay import RecordReplayManager
 from surfari.model.mcp.tool_registry import MCPToolRegistry
+from surfari.model.mcp.load_mcp_servers import build_mcp_registry_from_config
 from surfari.model.tool_executor import execute_tool_calls
 from surfari.agents.navigation_agent._value_resolver import (
     resolve_missing_value_in_llm_response,
@@ -125,6 +127,14 @@ class NavigationAgent(BaseAgent):
         self._native_tools = list(tools or [])
         self.tools = list(self._native_tools)  # will be replaced with merged list later
         self.mcp_tool_registry: MCPToolRegistry = mcp_tool_registry
+        if not self.mcp_tool_registry:
+            try:
+                self.mcp_tool_registry = run_sync(build_mcp_registry_from_config())
+                logger.debug("Loaded MCPToolRegistry from config")
+            except Exception as e:
+                logger.warning(f"Failed to load MCPToolRegistry from config: {e}")
+                self.mcp_tool_registry = None
+                
         self.agent_delegation_site_list: List[Dict[str, Any]] = agent_delegation_site_list or []
         self.tabs: List[Page] = []
         self.pdf_file_detected = False

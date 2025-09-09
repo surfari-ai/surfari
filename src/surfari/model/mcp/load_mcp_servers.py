@@ -1,6 +1,6 @@
 import os, json
 from pathlib import Path
-from typing import Tuple, Dict, Any, List
+from typing import Dict, Any, List
 
 import surfari.util.config as config
 from surfari.model.mcp.manager import MCPClientManager
@@ -15,7 +15,7 @@ def _expand_path(p: str) -> str:
 def _expand_args(args: List[str]) -> List[str]:
     return [_expand_path(a) for a in args]
 
-async def load_mcp_from_config(config_path: str | Path = mcp_config_path) -> MCPToolRegistry:
+async def build_mcp_registry_from_config(config_path: str | Path = mcp_config_path) -> MCPToolRegistry:
     """
     Load MCP servers from an mcp.json and return a ready manager + tool registry.
 
@@ -80,17 +80,42 @@ async def load_mcp_from_config(config_path: str | Path = mcp_config_path) -> MCP
         added_ids.append(sid)
 
     registry = MCPToolRegistry(mgr)
-    await registry.refresh(server_ids=added_ids)
     return registry
 
 async def _demo():
-    registry = await load_mcp_from_config()
-    print("Loaded tools:", registry.list_function_names())
-    # Try a filesystem read if present:
-    read_tool = next((n for n in registry.list_function_names() if n.endswith("__read_file") or n.endswith(".read_file") or n == "read_file"), None)
+    registry = await build_mcp_registry_from_config()
+    await registry.refresh()  # load all servers
+    names = registry.list_function_names()
+    print("Loaded tools:", names)
+
+    # resolve tools by simple suffix/exact match (same style as your read_file)
+    list_dir_tool = next((n for n in names if n.endswith("list_directory")), None)
+    read_tool     = next((n for n in names if n.endswith("read_file")), None)
+    stat_tool     = next((n for n in names if n.endswith("get_file_info")), None)
+    search_tool   = next((n for n in names if n.endswith("search_files")), None)
+
+    cfg_dir = os.path.dirname(mcp_config_path)
+
+    # 1) list_directory (directory that contains mcp.json)
+    if list_dir_tool:
+        res = await registry.execute(list_dir_tool, {"path": cfg_dir}, timeout_s=10)
+        print("list_directory ->", res.data if res.ok else res.error)
+
+    # 2) read_file (your existing demo)
     if read_tool:
         res = await registry.execute(read_tool, {"path": mcp_config_path}, timeout_s=10)
         print("read_file ->", res.data if res.ok else res.error)
+
+    # 3) get_file_info/stat
+    if stat_tool:
+        res = await registry.execute(stat_tool, {"path": mcp_config_path}, timeout_s=10)
+        print("get_file_info/stat ->", res.data if res.ok else res.error)
+
+    # 4) search_files (try a simple pattern under cfg_dir)
+    if search_tool:
+        res = await registry.execute(search_tool, {"path": cfg_dir, "pattern": "*.json"}, timeout_s=10)
+        print("search_files ->", res.data if res.ok else res.error)
+
     await registry.aclose()
 
-import asyncio; asyncio.run(_demo())
+#import asyncio; asyncio.run(_demo())

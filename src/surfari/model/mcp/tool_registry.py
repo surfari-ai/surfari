@@ -1,6 +1,4 @@
 from typing import Any, Dict, List, Optional, Tuple, Callable
-import asyncio
-import concurrent.futures
 import json
 import jsonschema
 import time
@@ -8,19 +6,11 @@ import time
 from surfari.model.mcp.manager import MCPClientManager
 from surfari.model.mcp.mcp_types import MCPTool, MCPCallResult
 from surfari.util import surfari_logger as _surfari_logger
+from surfari.util.async_bridge import run_sync
 
 logger = _surfari_logger.getLogger(__name__)
 
 SAFE_NAME = str.maketrans({c: "_" for c in " /:\\|@#?&%$!^*()[]{}<>,=+~`\""})
-_EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=4)
-
-def _run_sync(coro):
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        return asyncio.run(coro)
-    else:
-        return _EXECUTOR.submit(asyncio.run, coro).result()
 
 def _jsonschema_to_gemini(schema: Dict[str, Any]) -> Dict[str, Any]:
     if not schema:
@@ -72,7 +62,7 @@ class MCPToolRegistry:
         """Sync wrapper for aclose(). Safe to call from non-async contexts."""
         if self._closed:
             return
-        _run_sync(self.aclose())
+        run_sync(self.aclose())
 
     async def __aenter__(self) -> "MCPToolRegistry":
         return self
@@ -144,7 +134,7 @@ class MCPToolRegistry:
                     except Exception as e:
                         return {"ok": False, "error": f"Schema validation failed: {e}"}
                     t0 = time.perf_counter()
-                    res: MCPCallResult = _run_sync(self.execute(bound_name, kwargs, timeout_s=timeout))
+                    res: MCPCallResult = run_sync(self.execute(bound_name, kwargs, timeout_s=timeout))
                     dt = (time.perf_counter() - t0) * 1000
                     logger.debug("MCP proxy %s finished in %.1f ms (ok=%s)", bound_name, dt, getattr(res, "ok", None))                    
                     if res.ok:
