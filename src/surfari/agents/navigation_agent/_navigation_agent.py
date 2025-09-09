@@ -13,7 +13,6 @@ import surfari.util.surfari_logger as surfari_logger
 import surfari.util.playwright_util as playwright_util
 import surfari.view.text_layouter as text_layouter
 from surfari.util.cdp_browser import BrowserManager
-from surfari.util.async_bridge import run_sync
 from surfari.security.gmail_otp_fetcher import GmailOTPClientAsync
 from surfari.security.site_credential_manager import SiteCredentialManager
 from surfari.view.full_text_extractor import WebPageTextExtractor
@@ -126,15 +125,7 @@ class NavigationAgent(BaseAgent):
         self.save_screenshot: bool = save_screenshot
         self._native_tools = list(tools or [])
         self.tools = list(self._native_tools)  # will be replaced with merged list later
-        self.mcp_tool_registry: MCPToolRegistry = mcp_tool_registry
-        if not self.mcp_tool_registry:
-            try:
-                self.mcp_tool_registry = run_sync(build_mcp_registry_from_config())
-                logger.debug("Loaded MCPToolRegistry from config")
-            except Exception as e:
-                logger.warning(f"Failed to load MCPToolRegistry from config: {e}")
-                self.mcp_tool_registry = None
-                
+        self.mcp_tool_registry: MCPToolRegistry = mcp_tool_registry                
         self.agent_delegation_site_list: List[Dict[str, Any]] = agent_delegation_site_list or []
         self.tabs: List[Page] = []
         self.pdf_file_detected = False
@@ -264,7 +255,7 @@ class NavigationAgent(BaseAgent):
         if self.mcp_tool_registry:
             try:
                 await self.mcp_tool_registry.refresh()
-                mcp_funcs = self.mcp_tool_registry.as_python_proxy_tools()  # (your renamed method)
+                mcp_funcs = self.mcp_tool_registry.as_async_python_proxy_tools()  # (your renamed method)
                 merged.extend(mcp_funcs)
             except Exception as e:
                 logger.warning(f"Skipping MCP tools (refresh failed): {e}")
@@ -290,6 +281,13 @@ class NavigationAgent(BaseAgent):
             page = await browser_manager.get_new_page()
             
         self.add_donot_mask_terms_from_string(task_goal)
+        if not self.mcp_tool_registry:
+            try:
+                self.mcp_tool_registry = await build_mcp_registry_from_config()
+                logger.debug("Loaded MCPToolRegistry from config")
+            except Exception as e:
+                logger.warning(f"Failed to load MCPToolRegistry from config: {e}")
+                self.mcp_tool_registry = None        
 
         await self._merge_tools()  # now self.tools is the merged list
 
@@ -408,7 +406,7 @@ class NavigationAgent(BaseAgent):
 
                 if llm_response_json and "tool_calls" in llm_response_json:
                     logger.debug(f"LLM response contains tool calls, will execute the calls")
-                    tool_call_timeout = int(config.CONFIG["app"].get("tool_call_timeout", 300))
+                    tool_call_timeout = int(config.CONFIG["app"].get("tool_call_timeout", 15))
                     t0 = time.perf_counter()
                     results = await execute_tool_calls(llm_response_json, tools=self.tools, timeout=tool_call_timeout)
                     logger.debug("execute_tool_calls took %.1f ms", (time.perf_counter() - t0) * 1000)

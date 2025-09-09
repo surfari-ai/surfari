@@ -1,45 +1,92 @@
 import asyncio
 import time
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Callable, Tuple
+from typing import Any, Dict, List, Optional, Callable
 
-from surfari.model.mcp.mcp_types import MCPTool, MCPResource, MCPCallResult, MCPServerInfo
-
-# stdio transport
-from fastmcp.client.transports import StdioTransport
 from fastmcp import Client as FastMCPClient
+from fastmcp.client.transports import StdioTransport
 
-# ---------- Shared base (caching + normalization) ----------
+from surfari.model.mcp.mcp_types import MCPTool, MCPResource, MCPCallResult
+import surfari.util.surfari_logger as _surfari_logger
+
+logger = _surfari_logger.getLogger(__name__)
+
+
 class _BaseMCPClientSession(ABC):
-    def __init__(self, progress_cb: Optional[Callable[[int, int, str], None]] = None):
+    """
+    Transport-agnostic base session providing:
+      - connection lifecycle (subclasses implement connect())
+      - shared RPC implementations against FastMCPClient
+      - capability caching
+      - normalized responses + timeouts
+    """
+
+    def __init__(self, progress_cb: Optional[Callable[[int, int, str], None]] = None,
+                 *, default_timeout_s: float = 10.0) -> None:
         self.progress_cb = progress_cb
+        self._client: Optional[FastMCPClient] = None
         self._tools: List[MCPTool] = []
         self._resources: List[MCPResource] = []
         self._cap_lock = asyncio.Lock()
+        self._default_timeout_s = float(default_timeout_s)
 
-    # lifecycle
+    # ----- lifecycle --------------------------------------------------------
     @abstractmethod
-    async def connect(self) -> None: ...
-    @abstractmethod
-    async def aclose(self) -> None:  ...
+    async def connect(self) -> None:
+        """Create and __aenter__ the underlying FastMCP client, then call refresh_capabilities()."""
+        ...
 
-    # low-level RPCs (implemented by transports)
-    @abstractmethod
-    async def _rpc_list_tools(self) -> List[Any]: ...
-    @abstractmethod
-    async def _rpc_list_resources(self) -> List[Any]: ...
-    @abstractmethod
-    async def _rpc_read_resource(self, uri: str) -> List[Any]: ...
-    @abstractmethod
-    async def _rpc_call_tool(self, name: str, args: Dict[str, Any]) -> Any: ...
+    async def aclose(self) -> None:
+        """Shared close logic for both transports."""
+        if self._client:
+            try:
+                await self._client.__aexit__(None, None, None)
+            finally:
+                self._client = None
+        self._tools.clear()
+        self._resources.clear()
 
-    # normalization helpers (shared)
+    async def __aenter__(self):
+        await self.connect()
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        await self.aclose()
+
+    # ----- low-level RPCs (shared; use same FastMCPClient API) -------------
+    def _ensure_connected(self) -> FastMCPClient:
+        if self._client is None:
+            raise RuntimeError("MCP client not initialized. Call connect() first.")
+        return self._client
+
+    async def _rpc_list_tools(self) -> List[Any]:
+        client = self._ensure_connected()
+        return await client.list_tools()
+
+    async def _rpc_list_resources(self) -> List[Any]:
+        client = self._ensure_connected()
+        try:
+            return await client.list_resources()
+        except Exception:
+            return []
+
+    async def _rpc_read_resource(self, uri: str) -> List[Any]:
+        client = self._ensure_connected()
+        return await client.read_resource(uri)
+
+    async def _rpc_call_tool(self, name: str, args: Dict[str, Any]) -> Any:
+        client = self._ensure_connected()
+        # No inner wait_for: timeouts are enforced in call_tool()
+        return await client.call_tool(name, args)
+
+    # ----- normalization helpers -------------------------------------------
     @staticmethod
     def _norm_tools(raw: List[Any]) -> List[MCPTool]:
         out: List[MCPTool] = []
         for t in raw or []:
-            # tolerate both attrs/dicts across libs
             name = getattr(t, "name", None) or (t.get("name") if isinstance(t, dict) else None)
+            if not name:
+                continue
             desc = getattr(t, "description", None) or (t.get("description") if isinstance(t, dict) else None)
             schema = (
                 getattr(t, "inputSchema", None)
@@ -47,8 +94,7 @@ class _BaseMCPClientSession(ABC):
                 or (t.get("inputSchema") if isinstance(t, dict) else None)
                 or (t.get("input_schema") if isinstance(t, dict) else None)
             )
-            if name:
-                out.append(MCPTool(name=name, description=desc, input_schema=schema))
+            out.append(MCPTool(name=name, description=desc, input_schema=schema))
         return out
 
     @staticmethod
@@ -88,7 +134,7 @@ class _BaseMCPClientSession(ABC):
                 })
         return payloads
 
-    # public API (cached)
+    # ----- capabilities cache + public API ---------------------------------
     async def refresh_capabilities(self) -> None:
         async with self._cap_lock:
             try:
@@ -111,24 +157,44 @@ class _BaseMCPClientSession(ABC):
         try:
             parts = await self._rpc_read_resource(uri)
             payloads = self._norm_parts(parts)
-            return MCPCallResult(ok=True, data=payloads, elapsed_ms=int((time.monotonic() - start) * 1000))
+            return MCPCallResult(
+                ok=True,
+                data=payloads,
+                elapsed_ms=int((time.monotonic() - start) * 1000),
+            )
         except Exception as e:
             return MCPCallResult(ok=False, error=str(e))
 
-    async def call_tool(self, name: str, arguments: Dict[str, Any] | None = None, timeout_s: Optional[float] = None) -> MCPCallResult:
+    async def call_tool(
+        self,
+        name: str,
+        arguments: Dict[str, Any] | None = None,
+        timeout_s: Optional[float] = None,
+    ) -> MCPCallResult:
         start = time.monotonic()
         try:
+            logger.debug("Calling tool '%s' (timeout=%s) args=%s", name, timeout_s, arguments)
             coro = self._rpc_call_tool(name, arguments or {})
-            result = await (asyncio.wait_for(coro, timeout=timeout_s) if timeout_s else coro)
-            # Prefer .data (fastmcp CallToolResult), else return raw
+            effective = self._default_timeout_s if timeout_s is None else float(timeout_s)
+            # ⬇️ key change: no create_task — wrap the coroutine directly
+            result = await (asyncio.wait_for(coro, timeout=effective) if effective else coro)
+
             data = getattr(result, "data", None)
-            return MCPCallResult(ok=True, data=(data if data is not None else result), elapsed_ms=int((time.monotonic() - start) * 1000))
+            return MCPCallResult(
+                ok=True,
+                data=(data if data is not None else result),
+                elapsed_ms=int((time.monotonic() - start) * 1000),
+            )
         except asyncio.TimeoutError:
-            return MCPCallResult(ok=False, error=f"Timed out after {timeout_s}s")
+            return MCPCallResult(ok=False, error=f"Timed out after {effective}s")
         except Exception as e:
             return MCPCallResult(ok=False, error=str(e))
 
-    # hook for stdio progress
+    async def _rpc_call_tool(self, name: str, args: Dict[str, Any]) -> Any:
+        client = self._ensure_connected()
+        return await client.call_tool(name, args)
+
+    # optional hook for progress
     def _on_progress(self, current: int, total: int, message: str):
         if self.progress_cb:
             try:
@@ -137,92 +203,37 @@ class _BaseMCPClientSession(ABC):
                 pass
 
 
-# ---------- STDIO transport ----------
-
-# Add this import at top
-
 class MCPStdioFastMCPClientSession(_BaseMCPClientSession):
     """
-    STDIO-backed session using fastmcp.Client + StdioTransport.
-    This matches the behavior of your small working client.
+    STDIO-backed session using FastMCPClient + StdioTransport.
     """
-    def __init__(self, command: str, args: list[str], cwd: Optional[str] = None, env: Optional[dict] = None):
-        super().__init__(progress_cb=None)  # no progress callbacks here
-        self._client: Optional[FastMCPClient] = None
-        self._transport = StdioTransport(
-            command=command,
-            args=args,
-            cwd=cwd,
-            env=env,
-        )
 
-    async def connect(self):
+    def __init__(self, command: str, args: List[str],
+                 cwd: Optional[str] = None, env: Optional[dict] = None,
+                 *, default_timeout_s: float = 10.0) -> None:
+        super().__init__(progress_cb=None, default_timeout_s=default_timeout_s)
+        self._transport = StdioTransport(command=command, args=args, cwd=cwd, env=env)
+
+    async def connect(self) -> None:
         self._client = FastMCPClient(self._transport)
         await self._client.__aenter__()
+        # Probe connectivity (raises if broken) and cache caps
+        await self._client.list_tools()
         await self.refresh_capabilities()
 
-    async def aclose(self):
-        if self._client:
-            try:
-                await self._client.__aexit__(None, None, None)
-            finally:
-                self._client = None
-        self._tools.clear()
-        self._resources.clear()
-
-    # low-level RPCs
-    async def _rpc_list_tools(self):
-        return await self._client.list_tools()
-
-    async def _rpc_list_resources(self):
-        try:
-            return await self._client.list_resources()
-        except Exception:
-            return []
-
-    async def _rpc_read_resource(self, uri: str):
-        return await self._client.read_resource(uri)
-
-    async def _rpc_call_tool(self, name: str, args: Dict[str, Any]):
-        return await self._client.call_tool(name, args)
-
-# ---------- HTTP/SSE transport (FastMCP client) ----------
 
 class MCPHTTPClientSession(_BaseMCPClientSession):
     """
-    HTTP/SSE-backed session using fastmcp.Client(url).
+    HTTP/SSE-backed session using FastMCPClient(url).
     """
-    def __init__(self, url: str):
-        super().__init__(progress_cb=None)  # FastMCP HTTP client doesn't expose progress callbacks
-        self.url = url
-        self._client: Optional[FastMCPClient] = None
 
-    async def connect(self):
+    def __init__(self, url: str, *, default_timeout_s: float = 10.0) -> None:
+        super().__init__(progress_cb=None, default_timeout_s=default_timeout_s)
+        self.url = url
+
+    async def connect(self) -> None:
         self._client = FastMCPClient(self.url)
         await self._client.__aenter__()
+        # Probe connectivity and cache caps
+        await self._client.list_tools()
         await self.refresh_capabilities()
-
-    async def aclose(self):
-        if self._client:
-            try:
-                await self._client.__aexit__(None, None, None)
-            finally:
-                self._client = None
-        self._tools.clear()
-        self._resources.clear()
-
-    # low-level RPCs
-    async def _rpc_list_tools(self) -> List[Any]:
-        return await self._client.list_tools()
-
-    async def _rpc_list_resources(self) -> List[Any]:
-        try:
-            return await self._client.list_resources()
-        except Exception:
-            return []
-
-    async def _rpc_read_resource(self, uri: str) -> List[Any]:
-        return await self._client.read_resource(uri)
-
-    async def _rpc_call_tool(self, name: str, args: Dict[str, Any]) -> Any:
-        return await asyncio.wait_for(self._client.call_tool(name, args), timeout=1.0)

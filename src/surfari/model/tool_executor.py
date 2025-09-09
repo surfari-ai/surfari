@@ -118,12 +118,14 @@ async def execute_tool_calls(
     raw_calls = list(_extract_calls(tool_calls_payload))
 
     if parallel and len(raw_calls) > 1:
+        logger.debug(f"Executing {len(raw_calls)} tool calls in parallel: {[c.name for c in raw_calls]}")
         tasks = [
             _execute_single(call, registry, timeout=timeout, allow_extra_args=allow_extra_args, strict_types=strict_types)
             for call in raw_calls
         ]
         results = await asyncio.gather(*tasks, return_exceptions=False)
     else:
+        logger.debug(f"Executing {len(raw_calls)} tool calls serially: {[c.name for c in raw_calls]}")
         results = []
         for call in raw_calls:
             res = await _execute_single(
@@ -203,10 +205,13 @@ async def _execute_single(
         return ToolResult(id=call.id, name=name, ok=False, error=f"Argument error: {e}")
 
     async def _run() -> Any:
+        logger.debug(f"Running tool: {name} with args: {kwargs}")
         try:
             if inspect.iscoroutinefunction(func):
+                logger.debug(f"Tool {name} is async")
                 return await func(**kwargs)
             # Run sync function in a thread to allow cancellation via timeout
+            logger.debug(f"Tool {name} is sync")
             loop = asyncio.get_running_loop()
             return await loop.run_in_executor(None, lambda: func(**kwargs))
         except Exception as e:

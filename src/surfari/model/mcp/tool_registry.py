@@ -6,8 +6,6 @@ import time
 from surfari.model.mcp.manager import MCPClientManager
 from surfari.model.mcp.mcp_types import MCPTool, MCPCallResult
 from surfari.util import surfari_logger as _surfari_logger
-from surfari.util.async_bridge import run_sync
-
 logger = _surfari_logger.getLogger(__name__)
 
 SAFE_NAME = str.maketrans({c: "_" for c in " /:\\|@#?&%$!^*()[]{}<>,=+~`\""})
@@ -51,18 +49,13 @@ class MCPToolRegistry:
     # ---- lifecycle ---------------------------------------------------------
     async def aclose(self) -> None:
         """Async cleanup: close underlying MCP sessions."""
+        logger.debug("MCPToolRegistry closing...")
         if self._closed:
             return
         try:
             await self.manager.aclose()
         finally:
             self._closed = True
-
-    def close(self) -> None:
-        """Sync wrapper for aclose(). Safe to call from non-async contexts."""
-        if self._closed:
-            return
-        run_sync(self.aclose())
 
     async def __aenter__(self) -> "MCPToolRegistry":
         return self
@@ -118,14 +111,23 @@ class MCPToolRegistry:
             })
         return decls
 
-    def as_python_proxy_tools(self) -> list[Callable[..., Any]]:
+    def as_async_python_proxy_tools(self) -> list[Callable[..., Any]]:
+        """
+        Return async wrappers for each MCP tool.
+        Usage:
+            await registry.refresh()
+            tools = registry.as_async_python_proxy_tools()
+            res = await tools_by_name["mcp__filesystem__read_file"](path="...")
+
+        Each wrapper accepts optional `_timeout_s=<float>` to override per-call timeout.
+        """
         funcs: list[Callable[..., Any]] = []
 
         for fn_name, (_, mcp_tool) in self._by_fn.items():
             schema = mcp_tool.input_schema or {"type": "object", "properties": {}, "additionalProperties": True}
 
             def make_wrapper(bound_name: str, bound_schema: dict, bound_tool: MCPTool):
-                def _mcp_proxy(**kwargs):
+                async def _mcp_proxy(**kwargs):
                     # optional per-call override: pass _timeout_s in kwargs if needed
                     timeout = kwargs.pop("_timeout_s", None)
                     try:
@@ -134,7 +136,7 @@ class MCPToolRegistry:
                     except Exception as e:
                         return {"ok": False, "error": f"Schema validation failed: {e}"}
                     t0 = time.perf_counter()
-                    res: MCPCallResult = run_sync(self.execute(bound_name, kwargs, timeout_s=timeout))
+                    res: MCPCallResult = await self.execute(bound_name, kwargs, timeout_s=timeout)
                     dt = (time.perf_counter() - t0) * 1000
                     logger.debug("MCP proxy %s finished in %.1f ms (ok=%s)", bound_name, dt, getattr(res, "ok", None))                    
                     if res.ok:
@@ -173,7 +175,7 @@ class MCPToolRegistry:
                 jsonschema.validate(instance=args, schema=tool.input_schema)
             except Exception as e:
                 return MCPCallResult(ok=False, error=f"Schema validation failed: {e}")
-
+        logger.debug(f"Calling MCP tool '{tool.name}' on server '{server_id}' with args: {args}")
         return await self.manager.call_tool(server_id, tool.name, args, timeout_s)
 
     def has(self, fn_name: str) -> bool:
