@@ -104,29 +104,29 @@ function isNonBlocking(el) {
     return false;
 }
 
+// traverse shadow DOMs to get *actual* foremost element
+function deepestElementFromPoint(x, y) {
+    let el = document.elementFromPoint(x, y);
+    while (el && el.shadowRoot) {
+        // some shadow roots (e.g. closed ones) might not expose elementFromPoint
+        const inner = el.shadowRoot.elementFromPoint?.(x, y);
+        if (!inner || inner === el) break;
+        el = inner;
+    }
+    return el;
+}
+
+// cross-shadow version of .contains()
+function composedContains(a, b) {
+    for (let n = b; n; n = n.parentNode || (n.host ?? null)) {
+        if (n === a) return true;
+    }
+    return false;
+}
+
 function isRectObscured(rect, referenceEl) {
     if (isInsideIframe) return false;
-    // traverse shadow DOMs to get *actual* foremost element
-    function deepestElementFromPoint(x, y) {
-        let el = document.elementFromPoint(x, y);
-        while (el && el.shadowRoot) {
-            // some shadow roots (e.g. closed ones) might not expose elementFromPoint
-            const inner = el.shadowRoot.elementFromPoint?.(x, y);
-            if (!inner || inner === el) break;
-            el = inner;
-        }
-        return el;
-    }
 
-    // cross-shadow version of .contains()
-    function composedContains(a, b) {
-        for (let n = b; n; n = n.parentNode || (n.host ?? null)) {
-            if (n === a) return true;
-        }
-        return false;
-    }
-
-    // run the usual checks at one probe point
     function probe(x, y) {
         const topEl = deepestElementFromPoint(x, y);
         if (!topEl) return { covered: false, blocker: null };
@@ -165,6 +165,42 @@ function isRectObscured(rect, referenceEl) {
         );
         return true;
     }
+    return false;
+}
+
+function isTinyProxyButton(el) {
+    if (!(el instanceof Element)) return false;
+
+    const tag = el.tagName.toLowerCase();
+    const role = (el.getAttribute('role') || '').toLowerCase();
+    if (!(tag === 'button' || role === 'button')) return false;
+
+    const r = el.getBoundingClientRect();
+    const tiny = (r.width <= 4 && r.height <= 4) || (r.width * r.height <= 16);
+    if (!tiny) return false;
+
+    // If the button itself is labeled, that’s enough.
+    const selfLabel = (el.getAttribute('aria-label') || el.getAttribute('title') || '').trim();
+    if (selfLabel) return true;
+
+    const parent = el.parentElement;
+    if (!parent) return false;
+
+    // Short, nearby readable text on parent often names the action (“Add labels”)
+    const parentText = (parent.textContent || '').trim().replace(/\s+/g, ' ');
+    if (parentText && parentText.length > 0 && parentText.length <= 60) return true;
+
+    // Parent looks clickable-ish? (very common for inline-edit patterns)
+    const st = getStyle(parent);
+    if (
+        parent.matches('a,[role="link"],[role="button"]') ||
+        parent.tabIndex >= 0 ||
+        (st.cursor === 'pointer' && st.pointerEvents !== 'none') ||
+        typeof parent.onclick === 'function' || parent.hasAttribute('onclick')
+    ) {
+        return true;
+    }
+
     return false;
 }
 
@@ -495,6 +531,11 @@ function isVisible(node, checkHasSizedChild = true, checkHiddenByModal = true) {
         rect.left >= viewportWidth;
 
     if (physicallyTooSmall || horizontallyOffscreen) {
+        if (isTinyProxyButton(el)) {
+            logVisibleInfo("Assume visible: tiny proxy button/container", true, true, rect);
+            return true;
+        }
+
         if (style.overflow === "hidden") {
             logVisibleInfo("Element is too small or off-screen and has overflow: hidden");
             return false;
@@ -571,12 +612,9 @@ function getElementRole(el) {
         }
     }
 
-    debugLog(`Computed role: ${role} for ${el.outerHTML?.substring(0, 100)}`);
-    if (role && INTERACTIVE_ROLES.has(role)) {
-        return role;
-    }
-
-    return null;
+    const returned = role && INTERACTIVE_ROLES.has(role) ? role : null;
+    debugLog(`Computed role: ${role} (returned: ${returned}) for ${el.outerHTML?.substring(0, 100)}`);
+    return returned;
 }
 
 
@@ -1267,10 +1305,8 @@ function traverse(node) {
             }
         }
         if (elementRole === 'button' || elementRole === 'link' || elementRole === 'option' ||
-            node.tagName.toLowerCase() === 'button' || node.tagName.toLowerCase() === 'a' ||
-            node.tagName.toLowerCase() === 'img' || node.tagName.toLowerCase() === 'svg') {
-
-            const elementNodeRec = node.getBoundingClientRect();
+            node.tagName.toLowerCase() === 'a' || /^(img|svg)$/i.test(node.tagName)) {
+            let elementNodeRec = node.getBoundingClientRect();
             if (isRectObscured(elementNodeRec, node)) return;
             let content;
             const interaLevel = getInteractiveLevelClimb(node);
@@ -1326,24 +1362,45 @@ function traverse(node) {
                 }
                 debugLog(`Empty button/anchor: content to be added: "${content}"`);
                 // Check for image label
-                let labelText = '';
-                const imageWithAlt = Array.from(node.querySelectorAll('img[alt]')).find(img => {
-                    const alt = img.getAttribute('alt')?.trim();
-                    const ariaHidden = img.getAttribute('aria-hidden')?.toLowerCase();
-                    return alt && ariaHidden !== 'true';
-                });
-                const svgWithAriaLabel = Array.from(node.querySelectorAll('svg[aria-label]')).find(svg => {
-                    const ariaLabel = svg.getAttribute('aria-label')?.trim();
-                    const ariaHidden = svg.getAttribute('aria-hidden')?.toLowerCase();
-                    return ariaLabel && ariaHidden !== 'true';
-                });
-                if (imageWithAlt) {
-                    labelText = imageWithAlt.getAttribute('alt').trim();
-                    debugLog(`Empty button/anchor: Used <img alt> for labelText: "${labelText}"`);
-                } else if (svgWithAriaLabel) {
-                    labelText = svgWithAriaLabel.getAttribute('aria-label').trim();
-                    debugLog(`Empty button/anchor: Used <svg aria-label> for labelText: "${labelText}"`);
-                } else {
+                let labelText = "";
+
+                // 0) Fast path: visible <img alt> anywhere under node
+                const imgAltEl = node.querySelector('img[alt]');
+                if (imgAltEl) {
+                    const alt = (imgAltEl.getAttribute('alt') || '').trim();
+                    if (alt && (imgAltEl.getAttribute('aria-hidden') || '').toLowerCase() !== 'true' && !imgAltEl.closest('[aria-hidden="true"]')) {
+                        labelText = alt;
+                        debugLog(`Empty button/anchor: Used <img alt> for labelText: "${labelText}"`);
+                    }
+                }
+
+                // 1) visible descendant with aria-label (excluding the node itself via :scope)
+                let elWithAriaLabel = null;
+                if (!labelText) {
+                    elWithAriaLabel = Array.from(node.querySelectorAll(':scope [aria-label]')).find(el => {
+                        const label = (el.getAttribute('aria-label') || '').trim();
+                        return label && (el.getAttribute('aria-hidden') || '').toLowerCase() !== 'true' && !el.closest('[aria-hidden="true"]');
+                    });
+                    if (elWithAriaLabel) {
+                        labelText = elWithAriaLabel.getAttribute('aria-label').trim();
+                        debugLog(`Empty button/anchor: Used child's aria-label for labelText: "${labelText}"`);
+                    }
+                }
+
+                // 2) only for <svg> or <img>: nearest self/ancestor with aria-label, also visible
+                if (!labelText && node.tagName && /^(svg|img)$/i.test(node.tagName)) {
+                    const cand = node.closest('[aria-label]');
+                    if (cand) {
+                        const lbl = (cand.getAttribute('aria-label') || '').trim();
+                        if (lbl && (cand.getAttribute('aria-hidden') || '').toLowerCase() !== 'true' && !cand.closest('[aria-hidden="true"]')) {
+                            labelText = lbl;
+                            debugLog(`Empty button/anchor: Used closest aria-label for labelText: "${labelText}"`);
+                        }
+                    }
+                }
+
+                // 3) final fallback
+                if (!labelText) {
                     labelText = getLabelText(node, {
                         includeAriaLabelledBy: true,
                         includeAriaLabel: true,
