@@ -284,7 +284,7 @@ class NavigationAgent(BaseAgent):
         if not self.mcp_tool_registry:
             try:
                 self.mcp_tool_registry = await build_mcp_registry_from_config()
-                logger.debug("Loaded MCPToolRegistry from config")
+                logger.info("Loaded MCPToolRegistry from config")
             except Exception as e:
                 logger.warning(f"Failed to load MCPToolRegistry from config: {e}")
                 self.mcp_tool_registry = None        
