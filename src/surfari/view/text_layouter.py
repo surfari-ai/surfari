@@ -56,9 +56,14 @@ def rearrange_texts(input_str, y_threshold=16, h_scale_factor=4, additional_text
             
             # allow 1x1 radio, checkbox, or button
             if (w <=1 or h <= 1) and len(text) > 5:
-                logger.debug(f"Skipping off-screen or zero-width text: {text}, x={x}, y={y}, w={w}, h={h}")
-                continue # Skip off-screen elements          
-             
+                if text.startswith("[") or text.startswith("{"):
+                    logger.debug(f"Small interactive element passing through: {text}, x={x}, y={y}, w={w}, h={h}")
+                    w = h_scale_factor * len(text)
+                    h = y_threshold
+                else:
+                    logger.debug(f"Skipping clipped element: {text}, x={x}, y={y}, w={w}, h={h}")
+                    continue
+
             entries.append(
                 {
                     "_orig_index": i,  # preserve input order as a tiebreaker

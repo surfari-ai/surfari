@@ -570,8 +570,8 @@ async def take_actions(page, locator_actions, num_steps=1, reasoning=None) -> li
                 else:
                     await start_expansion_watch(element)
                     type = await element.evaluate("el => el.type", timeout=2000)    
-                    if type and type.lower() == "number":
-                        # If the input is a number, fill it with the value
+                    if type and type.lower() in ["number", "range"]:
+                        # If the input is a number or range, fill it with the value directly
                         await element.fill(value, timeout=2000, force=True)
                     else:
                         await element.clear(timeout=2000, force=True) 

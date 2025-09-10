@@ -429,6 +429,16 @@ function isVisibleCheckCached(node) {
     return checkedVisible;
 }
 
+function isSizeExempt(el) {
+    const tag = el.tagName?.toLowerCase();
+    const type = tag === "input" ? (el.type || "").toLowerCase() : "";
+    const role = (el.getAttribute("role") || "").toLowerCase();
+    return (
+        (tag === "input" && (type === "range" || type === "radio" || type === "checkbox")) ||
+        role === "slider" // author-supplied role
+    );
+}
+
 function isVisible(node, checkHasSizedChild = true, checkHiddenByModal = true) {
     // If node is a text node, use node.parentElement for visibility checks
     let el = (node.nodeType === Node.TEXT_NODE) ? node.parentElement : node;
@@ -497,11 +507,10 @@ function isVisible(node, checkHasSizedChild = true, checkHiddenByModal = true) {
     }
 
     const tag = el.tagName.toLowerCase();
-    const isRadioOrCheckbox = tag === "input" && (el.type === "radio" || el.type === "checkbox");
     const rect = el.getBoundingClientRect();
 
-    if (isRadioOrCheckbox) {
-        logVisibleInfo("Assume visible: Element is radio/checkbox with non-zero size", false, true);
+    if (isSizeExempt(el)) {
+        logVisibleInfo("Assume visible: Element is input radio/checkbox/range/slider", false, true);
         return true;
     }
 
@@ -1409,20 +1418,18 @@ function traverse(node) {
                     });
                     debugLog(`Empty button/anchor: getLabelText result: "${labelText}"`);
                 }
-                if (!node.closest('[aria-hidden="true"]')) {
-                    addSegment({
-                        type: 'text',
-                        content: content,
-                        enclose: 0,
-                        x: elementNodeRec.left,
-                        y: elementNodeRec.top,
-                        width: elementNodeRec.width,
-                        height: elementNodeRec.height,
-                        xpath: generateXPathJSInline(node),
-                        locatorString: generateLocator(node),
-                        labelText: labelText
-                    });
-                }
+                addSegment({
+                    type: 'text',
+                    content: content,
+                    enclose: 0,
+                    x: elementNodeRec.left,
+                    y: elementNodeRec.top,
+                    width: elementNodeRec.width,
+                    height: elementNodeRec.height,
+                    xpath: generateXPathJSInline(node),
+                    locatorString: generateLocator(node),
+                    labelText: labelText
+                });
                 return;
             } else if ((elementRole === 'option' || node.tagName.toLowerCase() === 'a') && !node.querySelector("input")) {
                 // use the combined visible text for anchors/options if they don't have nested inputs

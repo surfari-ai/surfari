@@ -19,7 +19,9 @@ ANNOTATION_GUIDE_PART = """
 3.1 {value-min-max-step} — Special case for a range input field
    → Action: "fill"  
    Example: {50-0-100-1}  
-   Note: fill with desired value, as constrained by min, max, and step.
+   Note: fill with desired value, as constrained by min, max, and step. 
+   Some applications may use a pair of such fields to represent a range, e.g. {50-0-100-1} and {70-0-100-1} for a range of 50 to 70 between 0 and 100 with step of 1.
+   Sometimes these values are proportional and need to be calculated, e.g. {75-0-150-5} might represent a middle point between x and y. Use surrounding text to help determine the current value and its mapping to the actual value.
 
 4. {{Prompt}} — Combobox with visible options  
    Options are listed below with hyphens, e.g. "- Limit Order"  
