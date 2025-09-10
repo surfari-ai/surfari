@@ -7,7 +7,7 @@ from surfari.model.mcp.manager import MCPClientManager
 from surfari.model.mcp.tool_registry import MCPToolRegistry
 from surfari.model.mcp.mcp_types import MCPServerInfo
 
-mcp_config_path = os.path.join(config.PROJECT_ROOT, "model", "mcp", "mcp.json")
+mcp_config_path = os.path.join(config.PROJECT_ROOT, "model", "mcp", "mcp_config.json")
 
 def _expand_path(p: str) -> str:
     return os.path.expanduser(os.path.expandvars(p))
@@ -17,7 +17,7 @@ def _expand_args(args: List[str]) -> List[str]:
 
 async def build_mcp_registry_from_config(config_path: str | Path = mcp_config_path) -> MCPToolRegistry:
     """
-    Load MCP servers from an mcp.json and return a ready manager + tool registry.
+    Load MCP servers from an mcp_config.json and return a ready manager + tool registry.
 
     Schema (examples):
     {
@@ -40,7 +40,7 @@ async def build_mcp_registry_from_config(config_path: str | Path = mcp_config_pa
 
     servers: Dict[str, Dict[str, Any]] = cfg.get("servers", {})
     if not servers:
-        raise ValueError("mcp.json has no 'servers' entries")
+        raise ValueError("mcp_config.json has no 'servers' entries")
 
     mgr = MCPClientManager()
     added_ids: List[str] = []
@@ -96,7 +96,7 @@ async def _demo():
 
     cfg_dir = os.path.dirname(mcp_config_path)
 
-    # 1) list_directory (directory that contains mcp.json)
+    # 1) list_directory (directory that contains mcp_config.json)
     if list_dir_tool:
         res = await registry.execute(list_dir_tool, {"path": cfg_dir}, timeout_s=10)
         print("list_directory ->", res.data if res.ok else res.error)

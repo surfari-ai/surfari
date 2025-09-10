@@ -44,6 +44,7 @@ packages = { find = { where = ["src"], include = ["surfari*"], exclude = ["surfa
 [tool.setuptools."package-data"]
 surfari = [
     "util/config.json",
+    "model/mcp/mcp_config.json",
     "view/html_to_text.js",
     "security/.env",
     "security/credentials.db",
