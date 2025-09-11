@@ -48,7 +48,10 @@ surfari = [
     "view/html_to_text.js",
     "security/.env",
     "security/credentials.db",
-    "security/google_client_secret.json"
+    "security/google_client_secret.json",
+    "file_sandbox/test_mcp_config.json",
+    "file_sandbox/upload/testDocForUpload.docx",
+    "file_sandbox/upload/testDocForUpload.pdf"
 ]
 
 [tool.pytest.ini_options]
