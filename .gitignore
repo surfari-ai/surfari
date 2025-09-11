@@ -29,5 +29,3 @@ pyvenv.cfg
 installers/surfari-*.zip
 container_launcher/push-docker-hub.sh
 release.txt
-*.docx
-*.pdf
