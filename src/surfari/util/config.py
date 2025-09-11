@@ -20,7 +20,11 @@ if not os.path.exists(logs_folder_path):
 download_folder_path = os.path.join(PROJECT_ROOT, CONFIG["app"].get("download_folder", "downloads"))
 if not os.path.exists(download_folder_path):
     os.makedirs(download_folder_path)
-        
+
+upload_folder_path = os.path.join(PROJECT_ROOT, CONFIG["app"].get("upload_folder", "uploads"))
+if not os.path.exists(upload_folder_path):
+    os.makedirs(upload_folder_path)
+
 debug_files_folder_path = os.path.join(logs_folder_path, CONFIG["app"].get("debug_files_folder", "debugfiles"))
 if not os.path.exists(debug_files_folder_path):
     os.makedirs(debug_files_folder_path)

@@ -49,9 +49,9 @@ surfari = [
     "security/.env",
     "security/credentials.db",
     "security/google_client_secret.json",
-    "file_sandbox/test_mcp_config.json",
-    "file_sandbox/upload/testDocForUpload.docx",
-    "file_sandbox/upload/testDocForUpload.pdf"
+    "uploads/testDocForUpload.docx",
+    "uploads/testDocForUpload.pdf",
+    "uploads/subfolder/testDocForUpload.txt"
 ]
 
 [tool.pytest.ini_options]

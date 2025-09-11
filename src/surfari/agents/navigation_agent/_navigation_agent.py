@@ -201,7 +201,7 @@ class NavigationAgent(BaseAgent):
                 self.tabs.append(new_page)
                 await self._setup_download_listener(new_page)
                 await self._setup_popup_listener(new_page)
-                await self._setup_filechooser_listener(new_page, config.CONFIG["app"].get("file_upload_path", ""))
+                await self._setup_filechooser_listener(new_page)
                 self.current_working_tab = new_page
                 logger.info(f"Popup detected, appended newly opened new tab with URL: {new_page.url} and set up listeners.")
             except Exception as e:
@@ -210,9 +210,15 @@ class NavigationAgent(BaseAgent):
         # Attach the handler
         page.on("popup", handle_popup)
         
-    async def _setup_filechooser_listener(self, page: Page, file_path: str):
+    async def _setup_filechooser_listener(self, page: Page) -> None:
         """Attach a persistent filechooser handler to a Page."""
-        async def handle_filechooser(file_chooser: FileChooser, file_path: str, timeout: int = 10000):
+        async def handle_filechooser(file_chooser: FileChooser, timeout: int = 10000):
+            file_to_upload = getattr(self, "file_to_upload", None)
+            if not file_to_upload:
+                file_to_upload = os.path.join(config.upload_folder_path, "testDocForUpload.pdf")
+            else:
+                self.file_to_upload = None  # reset after use
+
             el = file_chooser.element
 
             # Collect some attributes for debugging
@@ -232,9 +238,9 @@ class NavigationAgent(BaseAgent):
             )
 
             async with file_chooser.page.expect_request_finished(timeout=timeout) as req_info:
-                await file_chooser.set_files(file_path)
+                await file_chooser.set_files(file_to_upload)
 
-            logger.debug(f"[FileChooser] File set: {file_path}")
+            logger.debug(f"[FileChooser] File set: {file_to_upload}")
 
             try:
                 req = await req_info.value
@@ -247,9 +253,9 @@ class NavigationAgent(BaseAgent):
                 logger.debug("[FileChooser] Network idle — upload likely finished")
             except Exception:
                 logger.debug("[FileChooser] Network did not go idle within timeout")
-                 
-        page.on("filechooser", lambda fc: handle_filechooser(fc, file_path))       
-        
+
+        page.on("filechooser", lambda fc: handle_filechooser(fc))
+
     async def _merge_tools(self) -> None:
         merged = list(self._native_tools)
         if self.mcp_tool_registry:
@@ -316,7 +322,7 @@ class NavigationAgent(BaseAgent):
         logger.info("Before turns, setting up download and popup listeners...")
         await self._setup_download_listener(page)
         await self._setup_popup_listener(page)
-        await self._setup_filechooser_listener(page, config.CONFIG["app"].get("file_upload_path", ""))
+        await self._setup_filechooser_listener(page)
         
         self.tabs = [page]  # start tab tracking at the initial page
         self.current_working_tab = page

@@ -65,6 +65,10 @@ def _maybe_start_embedded_http(sid: str, scfg: Dict[str, Any]) -> Optional[str]:
         return None
 
     root = _expand_path(scfg.get("root") or _derive_fs_root_from_args(scfg))
+    if not Path(root).expanduser().exists():
+        logger.debug("[MCP] '%s': root '%s' not found; using config.upload_folder_path", sid, root)
+        root = _expand_path(config.upload_folder_path)
+        
     try:
         url = start_embedded_fs_server_http(root=root)  # e.g. http://127.0.0.1:17321/mcp
         logger.debug("[MCP] '%s': started embedded HTTP server at %s (root=%s)", sid, url, root)
@@ -177,22 +181,22 @@ async def _demo():
 
     # Server normalizes paths: "/", ".", "/sub/child", "sub/child"
     if list_dir_tool:
-        for p in ["/", ".", "/upload", "upload", "/nonexistent", "nonexistent"]:
+        for p in ["/", ".", "/subfolder", "subfolder", "/nonexistent", "nonexistent"]:
             res = await registry.execute(list_dir_tool, {"path": p}, timeout_s=10)
             logger.debug("result: list_directory(%r) -> %s", p, res.data if res.ok else res.error)
 
     if read_tool:
-        for p in ["/test_mcp_config.json", "upload/testDocForUpload.pdf"]:
+        for p in ["/subfolder/testDocForUpload.txt", "subfolder/testDocForUpload.pdf"]:
             res = await registry.execute(read_tool, {"path": p}, timeout_s=10)
             logger.debug("result: read_file(%r) -> %s", p, res.data if res.ok else res.error)
 
     if stat_tool:
-        for p in ["/test_mcp_config.json", "upload/testDocForUpload.docx"]:
+        for p in ["/testDocForUpload.pdf", "testDocForUpload.pdf"]:
             res = await registry.execute(stat_tool, {"path": p}, timeout_s=10)
             logger.debug("result: get_file_info(%r) -> %s", p, res.data if res.ok else res.error)
 
     if search_tool:
-        res = await registry.execute(search_tool, {"path": "/", "pattern": "*/test*"}, timeout_s=10)
+        res = await registry.execute(search_tool, {"path": "/", "pattern": "test*"}, timeout_s=10)
         logger.debug("result: search_files -> %s", res.data if res.ok else res.error)
 
     await registry.aclose()
