@@ -36,6 +36,7 @@ def parse_args():
     parser.add_argument("-S", "--use_screenshot", action="store_true", help="Send screenshot to LLM too")
     parser.add_argument("-w", "--save_screenshot", action="store_true", help="Save screenshots to disk")
     parser.add_argument("-c", "--num_of_tabs", type=int, default=10, help="Number of concurrent tabs to open for batch tasks")
+    parser.add_argument("-a", "--connect_only", action="store_true", help="Do not launch a browser; connect to an already running one via CDP. Applies to all rows in batch mode")
     return parser.parse_args()
 
 
@@ -53,6 +54,8 @@ async def run_single_task(
     rr_use_parameterization=False,
     use_screenshot=False,
     save_screenshot=False,
+    *,
+    connect_only=False,
 ):
     """Executes a single navigation task."""
     page = None
@@ -61,10 +64,30 @@ async def run_single_task(
         cred_manager.save_credentials(site_name=site_name, url=url, username=username, password=password)
         logger.info(f"[{site_name}] Credentials saved")
 
-    manager = await BrowserManager.get_instance(use_system_chrome=use_system_chrome)
+    manager = await BrowserManager.get_instance(
+        use_system_chrome=use_system_chrome,
+        connect_only=connect_only,
+    )
     await asyncio.sleep(1)
-    page = await manager.get_new_page()
-    logger.info("Successfully got a new page")
+    if connect_only:
+        context = manager.browser_context
+        logger.info("connect_only=True → reusing existing BrowserContext, context has %d pages", len(context.pages))
+        for returnedPage in context.pages:
+            logger.debug("Page has URL: %s (closed=%s))", returnedPage.url, returnedPage.is_closed())
+            if "localhost" in returnedPage.url and "5173" in returnedPage.url:
+                logger.debug("Skipping localhost:5173 page, this is the main window UI")
+                continue
+            page = returnedPage
+            if (returnedPage.url == "about:blank" or returnedPage.url == "chrome://newtab/") and not returnedPage.is_closed():
+                logger.debug("Using this blank page")
+                break
+    else:
+        page = await manager.get_new_page()
+        
+    if page:
+        logger.info("Successfully got a new page")
+    else:
+        raise RuntimeError("Failed to get a new page")
 
     nav_agent = NavigationAgent(
         model=model,
@@ -80,22 +103,25 @@ async def run_single_task(
     result = await nav_agent.run(page, task_goal=task_goal)
     logger.info(f"[{site_name or url}] Final answer: {result}")
 
-    try:
-        if page and not page.is_closed():
-            await page.close()
-    except Exception:
-        pass
-
+    if not connect_only:
+        try:
+            if page and not page.is_closed():
+                await page.close()
+        except Exception:
+            pass
 
 async def _worker(semaphore, kwargs):
     async with semaphore:
         await run_single_task(**kwargs)
 
 
-async def run_batch_csv(csv_path, model, use_system_chrome, num_of_tabs):
+async def run_batch_csv(csv_path, model, use_system_chrome, num_of_tabs, *, connect_only=False):
     """Runs tasks from a CSV batch file with limited concurrency."""
     tasks = []
     semaphore = asyncio.Semaphore(num_of_tabs)
+
+    def truthy(v: str) -> bool:
+        return (v or "").strip().lower() in ("1", "true", "yes", "y", "t")
 
     with open(csv_path, newline='') as f:
         reader = csv.DictReader(f)
@@ -114,12 +140,12 @@ async def run_batch_csv(csv_path, model, use_system_chrome, num_of_tabs):
             username = row.get("username", "").strip() or None
             password = row.get("password", "").strip() or None
 
-            enable_data_masking = row.get("enable_data_masking", "").strip().lower() in ("1", "true", "yes")
-            multi_action_per_turn = row.get("multi_action_per_turn", "").strip().lower() in ("1", "true", "yes")
-            record_and_replay = row.get("record_and_replay", "").strip().lower() in ("1", "true", "yes")
-            rr_use_parameterization = row.get("rr_use_parameterization", "").strip().lower() in ("1", "true", "yes")
-            use_screenshot = row.get("use_screenshot", "").strip().lower() in ("1", "true", "yes")
-            save_screenshot = row.get("save_screenshot", "").strip().lower() in ("1", "true", "yes")
+            enable_data_masking = truthy(row.get("enable_data_masking", ""))
+            multi_action_per_turn = truthy(row.get("multi_action_per_turn", ""))
+            record_and_replay = truthy(row.get("record_and_replay", ""))
+            rr_use_parameterization = truthy(row.get("rr_use_parameterization", ""))
+            use_screenshot = truthy(row.get("use_screenshot", ""))
+            save_screenshot = truthy(row.get("save_screenshot", ""))
 
             kwargs = {
                 "task_goal": task_goal,
@@ -133,6 +159,7 @@ async def run_batch_csv(csv_path, model, use_system_chrome, num_of_tabs):
                 "rr_use_parameterization": rr_use_parameterization,
                 "use_screenshot": use_screenshot,
                 "save_screenshot": save_screenshot,
+                "connect_only": connect_only,  # applies to all rows
             }
             if username:
                 kwargs["username"] = username
@@ -159,6 +186,7 @@ async def main():
                 model=args.llm_model,
                 use_system_chrome=args.use_system_chrome,
                 num_of_tabs=args.num_of_tabs,
+                connect_only=args.connect_only,
             )
         else:
             await run_single_task(
@@ -175,6 +203,7 @@ async def main():
                 rr_use_parameterization=args.rr_use_parameterization,
                 use_screenshot=args.use_screenshot,
                 save_screenshot=args.save_screenshot,
+                connect_only=args.connect_only,
             )
     except Exception:
         logger.critical("Browser was forcefully closed. Stopping all processes.", exc_info=True)

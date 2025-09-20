@@ -19,7 +19,7 @@ REMOTE_DEBUGGING_PORT = 9222
 screen_width = config.CONFIG["app"].get("browser_width", 1712)
 screen_height = config.CONFIG["app"].get("browser_height", 1072)
 
-USER_DATA_DIR = os.path.join(config.PROJECT_ROOT, "playwright_chrome_profile")
+USER_DATA_DIR = config.chrome_profile_folder_path
 
 # Platform-specific Chrome paths
 if platform.system() == "Darwin":

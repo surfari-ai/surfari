@@ -6,6 +6,7 @@
         "project_log_folder": "logs",
         "screenshot_folder": "screenshots",
         "debug_files_folder": "debugfiles",
+        "chrome_profile_folder": "surfari-chrome-profile",
         "hil_polling_times": 6000,
         "max_number_of_turns": 100,
         "network_max_inflight": 1,

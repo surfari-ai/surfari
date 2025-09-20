@@ -33,4 +33,5 @@ screenshot_folder_path = os.path.join(logs_folder_path, CONFIG["app"].get("scree
 if not os.path.exists(screenshot_folder_path):
     os.makedirs(screenshot_folder_path)
     
+chrome_profile_folder_path = os.path.join(PROJECT_ROOT, CONFIG["app"].get("chrome_profile_folder", "surfari-chrome-profile"))
 
