@@ -15,6 +15,7 @@ import surfari.util.surfari_logger as surfari_logger
 logger = surfari_logger.getLogger(__name__)
 
 REMOTE_DEBUGGING_PORT = 9222
+REMOTE_DEBUGGING_HOST = "127.0.0.1"
 
 screen_width = config.CONFIG["app"].get("browser_width", 1712)
 screen_height = config.CONFIG["app"].get("browser_height", 1072)
@@ -92,9 +93,11 @@ class BrowserManager:
     """
     Manage a Playwright CDP connection.
 
-    - If connect_only=True, we DO NOT launch any browser process and will try to
-      connect to an already-running browser via CDP (cdp_endpoint or host/port).
-    - If connect_only=False (default), we launch Chrome/Chromium and then connect.
+    Behavior:
+      - If `cdp_endpoint` is provided (e.g. "http://127.0.0.1:9222"), we DO NOT launch
+        a browser; we connect to that endpoint.
+      - If `cdp_endpoint` is None/""/"auto", we launch Chrome/Chromium and then connect
+        to http://127.0.0.1:9222 (constants REMOTE_DEBUGGING_HOST/PORT).
     """
     _instance: ClassVar[Optional["BrowserManager"]] = None
     _instance_lock: ClassVar[asyncio.Lock] = asyncio.Lock()
@@ -102,21 +105,20 @@ class BrowserManager:
     def __init__(
         self,
         use_system_chrome: bool = False,
-        remote_debugging_port: int = REMOTE_DEBUGGING_PORT,
         user_data_dir: str = USER_DATA_DIR,
         logger=logger,
         wait_for_browser_start: float = 2.0,
         shutdown_timeout: float = 10.0,
         *,
-        connect_only: bool = False,
         cdp_endpoint: Optional[str] = None,
-        remote_debugging_host: str = "localhost",
     ):
         self.use_system_chrome = use_system_chrome
-        self.remote_debugging_port = remote_debugging_port
-        self.remote_debugging_host = remote_debugging_host
-        self.cdp_endpoint = cdp_endpoint  # e.g. "http://127.0.0.1:9222"
-        self.connect_only = connect_only
+
+        # No longer configurable via initializer; use constants for launch mode.
+        self.remote_debugging_port = REMOTE_DEBUGGING_PORT
+        self.remote_debugging_host = REMOTE_DEBUGGING_HOST
+
+        self.cdp_endpoint = cdp_endpoint  # when set, we attach instead of launching
 
         self.user_data_dir = user_data_dir
         self.logger = logger
@@ -130,9 +132,10 @@ class BrowserManager:
         self._loop = asyncio.get_event_loop()
         self._signals_installed = False
         self.stopped = False
+
+        mode = "attach" if self._is_attach_mode() else "launch"
         self.logger.info(
-            f"Browser instance initialized "
-            f"(Screen: {screen_width}x{screen_height}, connect_only={self.connect_only}, "
+            f"Browser instance initialized (Screen: {screen_width}x{screen_height}, mode={mode}, "
             f"cdp_endpoint={self.cdp_endpoint or 'auto'})"
         )
 
@@ -141,18 +144,12 @@ class BrowserManager:
         cls,
         use_system_chrome: bool = True,
         *,
-        connect_only: bool = False,
         cdp_endpoint: Optional[str] = None,
-        remote_debugging_port: int = REMOTE_DEBUGGING_PORT,
-        remote_debugging_host: str = "localhost",
     ) -> "BrowserManager":
         async with cls._instance_lock:
             if cls._instance is None:
                 cls._instance = cls(
                     use_system_chrome=use_system_chrome,
-                    remote_debugging_port=remote_debugging_port,
-                    remote_debugging_host=remote_debugging_host,
-                    connect_only=connect_only,
                     cdp_endpoint=cdp_endpoint,
                 )
                 await cls._instance.start()
@@ -164,6 +161,14 @@ class BrowserManager:
             if cls._instance:
                 await cls._instance.stop()
                 cls._instance = None
+
+    def _is_attach_mode(self) -> bool:
+        """
+        True when we should NOT launch a browser and instead connect to an existing endpoint.
+        Treat None/""/"auto" as 'launch mode'.
+        """
+        val = (self.cdp_endpoint or "").strip().lower()
+        return bool(val) and val != "auto"
 
     async def get_new_page(self) -> Page:
         if not self.browser_context:
@@ -183,13 +188,13 @@ class BrowserManager:
         self.logger.info("Starting BrowserManager...")
         await self._install_signal_handlers()
 
-        if self.connect_only:
-            self.logger.info("connect_only=True → will NOT launch a browser; connecting to existing CDP target.")
-        else:
+        if not self._is_attach_mode():
             if not self.running_in_container():
                 await self._launch_browser()
             else:
                 self.logger.info("Running in container → skipping browser launch.")
+        else:
+            self.logger.info("Attach mode → will NOT launch a browser; connecting to existing CDP target.")
 
         await self._connect_over_cdp()
 
@@ -241,10 +246,6 @@ class BrowserManager:
         return args
 
     async def _launch_browser(self) -> None:
-        if self.connect_only:
-            self.logger.info("connect_only=True → skip _launch_browser()")
-            return
-
         if self.use_system_chrome:
             await self._launch_system_chrome()
         else:
@@ -281,11 +282,11 @@ class BrowserManager:
             if parsed.scheme in ("http", "https"):
                 return self.cdp_endpoint
             if parsed.scheme in ("ws", "wss"):
-                host = parsed.hostname or self.remote_debugging_host
-                port = parsed.port or self.remote_debugging_port
+                host = parsed.hostname or REMOTE_DEBUGGING_HOST
+                port = parsed.port or REMOTE_DEBUGGING_PORT
                 return f"http://{host}:{port}"
-        # default
-        return f"http://{self.remote_debugging_host}:{self.remote_debugging_port}"
+        # default (launch mode)
+        return f"http://{REMOTE_DEBUGGING_HOST}:{REMOTE_DEBUGGING_PORT}"
 
     async def _connect_over_cdp(self) -> None:
         endpoint = self._effective_cdp_endpoint()
@@ -347,7 +348,7 @@ class BrowserManager:
     async def _shutdown_browser(self) -> None:
         """
         Only terminates a browser that WE spawned (i.e., self.chrome_process).
-        If connect_only=True, no process will be present and nothing is killed.
+        In attach mode (cdp_endpoint provided), nothing is killed.
         """
         self.logger.info("Shutting down browser called.")
         if self.chrome_process:

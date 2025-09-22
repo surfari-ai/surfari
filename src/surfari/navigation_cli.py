@@ -36,7 +36,11 @@ def parse_args():
     parser.add_argument("-S", "--use_screenshot", action="store_true", help="Send screenshot to LLM too")
     parser.add_argument("-w", "--save_screenshot", action="store_true", help="Save screenshots to disk")
     parser.add_argument("-c", "--num_of_tabs", type=int, default=10, help="Number of concurrent tabs to open for batch tasks")
-    parser.add_argument("-a", "--connect_only", action="store_true", help="Do not launch a browser; connect to an already running one via CDP. Applies to all rows in batch mode")
+    parser.add_argument(
+        "-a", "--cdp_endpoint", 
+        help="Connect to an already running browser via CDP at this endpoint (e.g. http://127.0.0.1:9222). "
+             "If omitted or set to 'auto', Surfari will launch its own browser."
+    )
     return parser.parse_args()
 
 
@@ -55,7 +59,7 @@ async def run_single_task(
     use_screenshot=False,
     save_screenshot=False,
     *,
-    connect_only=False,
+    cdp_endpoint: str | None = None,
 ):
     """Executes a single navigation task."""
     page = None
@@ -66,12 +70,14 @@ async def run_single_task(
 
     manager = await BrowserManager.get_instance(
         use_system_chrome=use_system_chrome,
-        connect_only=connect_only,
+        cdp_endpoint=cdp_endpoint,
     )
     await asyncio.sleep(1)
-    if connect_only:
+
+    attach_mode = bool((cdp_endpoint or "").strip()) and (cdp_endpoint.strip().lower() != "auto")
+    if attach_mode:
         context = manager.browser_context
-        logger.info("connect_only=True → reusing existing BrowserContext, context has %d pages", len(context.pages))
+        logger.info("Attach mode → reusing existing BrowserContext, context has %d pages", len(context.pages))
         for returnedPage in context.pages:
             logger.debug("Page has URL: %s (closed=%s))", returnedPage.url, returnedPage.is_closed())
             if "localhost" in returnedPage.url and "5173" in returnedPage.url:
@@ -103,7 +109,7 @@ async def run_single_task(
     result = await nav_agent.run(page, task_goal=task_goal)
     logger.info(f"[{site_name or url}] Final answer: {result}")
 
-    if not connect_only:
+    if not attach_mode:
         try:
             if page and not page.is_closed():
                 await page.close()
@@ -115,7 +121,7 @@ async def _worker(semaphore, kwargs):
         await run_single_task(**kwargs)
 
 
-async def run_batch_csv(csv_path, model, use_system_chrome, num_of_tabs, *, connect_only=False):
+async def run_batch_csv(csv_path, model, use_system_chrome, num_of_tabs, *, cdp_endpoint: str | None = None):
     """Runs tasks from a CSV batch file with limited concurrency."""
     tasks = []
     semaphore = asyncio.Semaphore(num_of_tabs)
@@ -159,7 +165,7 @@ async def run_batch_csv(csv_path, model, use_system_chrome, num_of_tabs, *, conn
                 "rr_use_parameterization": rr_use_parameterization,
                 "use_screenshot": use_screenshot,
                 "save_screenshot": save_screenshot,
-                "connect_only": connect_only,  # applies to all rows
+                "cdp_endpoint": cdp_endpoint,  # applies to all rows
             }
             if username:
                 kwargs["username"] = username
@@ -186,7 +192,7 @@ async def main():
                 model=args.llm_model,
                 use_system_chrome=args.use_system_chrome,
                 num_of_tabs=args.num_of_tabs,
-                connect_only=args.connect_only,
+                cdp_endpoint=args.cdp_endpoint,
             )
         else:
             await run_single_task(
@@ -203,7 +209,7 @@ async def main():
                 rr_use_parameterization=args.rr_use_parameterization,
                 use_screenshot=args.use_screenshot,
                 save_screenshot=args.save_screenshot,
-                connect_only=args.connect_only,
+                cdp_endpoint=args.cdp_endpoint,
             )
     except Exception:
         logger.critical("Browser was forcefully closed. Stopping all processes.", exc_info=True)
