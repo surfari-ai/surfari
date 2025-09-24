@@ -1,13 +1,17 @@
+import logging
+logging.getLogger("asyncio").setLevel(logging.ERROR)
+
 import argparse
 import asyncio
 import os
 import csv
-import sys  # Added for system exit
-
+import sys
+import json
 import surfari.util.config as config
 from surfari.security.site_credential_manager import SiteCredentialManager
 from surfari.util.cdp_browser import BrowserManager
 from surfari.agents.navigation_agent import NavigationAgent
+from surfari.agents.navigation_agent._record_and_replay import RecordReplayManager
 
 import surfari.util.surfari_logger as surfari_logger
 logger = surfari_logger.getLogger(__name__)
@@ -40,6 +44,13 @@ def parse_args():
         "-a", "--cdp_endpoint", 
         help="Connect to an already running browser via CDP at this endpoint (e.g. http://127.0.0.1:9222). "
              "If omitted or set to 'auto', Surfari will launch its own browser."
+    )
+
+    # NEW: list recorded tasks without running the agent
+    parser.add_argument(
+        "--list_recorded_tasks",
+        action="store_true",
+        help="Print the list of recorded tasks as JSON and exit (does not run the agent)."
     )
     return parser.parse_args()
 
@@ -184,6 +195,14 @@ async def main():
         logger.info(f"Using custom LLM model: {args.llm_model}")
 
     try:
+        # NEW: handle listing recorded tasks only (no agent/browser)
+        if args.list_recorded_tasks:
+            logging.disable(logging.CRITICAL + 1)  # blocks ALL logging calls
+            mgr = RecordReplayManager()
+            tasks = mgr.list_recorded_tasks()
+            print(json.dumps(tasks, ensure_ascii=False, indent=2))
+            return
+
         if args.batch_file:
             if not os.path.isfile(args.batch_file):
                 raise FileNotFoundError(f"Batch file not found: {args.batch_file}")

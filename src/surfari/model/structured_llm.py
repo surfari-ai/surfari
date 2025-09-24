@@ -24,12 +24,20 @@ logger = surfari_logger.getLogger(__name__)
 
 # Load environment variables once at the module level.
 # This ensures that all instances of LLMClient can access them.
-env_path = os.path.join(config.PROJECT_ROOT, "security", ".env_dev")
-if not os.path.exists(env_path):
-    env_path = os.path.join(config.PROJECT_ROOT, "security", ".env")
-
-logger.debug(f"Loading environment variables from {env_path}")
-load_dotenv(dotenv_path=env_path)
+# (Moved to lazy-load to avoid import-time side effects.)
+_ENV_LOADED = False
+def _compute_env_path():
+    env_path = os.path.join(config.PROJECT_ROOT, "security", ".env_dev")
+    if not os.path.exists(env_path):
+        env_path = os.path.join(config.PROJECT_ROOT, "security", ".env")
+    return env_path
+def _ensure_env_loaded():
+    global _ENV_LOADED
+    if _ENV_LOADED:
+        return
+    env_path = _compute_env_path()
+    load_dotenv(dotenv_path=env_path)
+    _ENV_LOADED = True
 
 
 class TokenStats:
@@ -70,6 +78,7 @@ class LLMClient:
         """
         Initializes the LLMClient with API keys and its own TokenStats instance.
         """
+        _ensure_env_loaded()
         self.openai_api_key = os.getenv("OPENAI_API_KEY")
         self.gemini_api_key = os.getenv("GEMINI_API_KEY")
         self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")

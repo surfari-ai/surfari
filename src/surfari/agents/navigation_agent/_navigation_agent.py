@@ -104,12 +104,13 @@ class NavigationAgent(BaseAgent):
         mcp_tool_registry: Optional[MCPToolRegistry] = None,
         agent_delegation_site_list: List[Dict[str, Any]] = None,
     ) -> None:
-        name = name if name else f"NavigationAgent-{site_name}"
+        norm = (site_name or "").strip()
+        self.site_name = norm if norm else "Unknown Site"
+        name = name if name else f"NavigationAgent-{self.site_name}"
         # look up by site_name fuzzy match
-        self.site_name: str = site_name
         if self.site_name != "Unknown Site":
             scm = SiteCredentialManager()
-            site_info = scm.find_site_info_by_name(site_name)
+            site_info = scm.find_site_info_by_name(self.site_name)
             if site_info:
                 url = site_info.get("url")
                 site_id = site_info.get("site_id")

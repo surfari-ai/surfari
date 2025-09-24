@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import List, Dict, Any, Union
+from typing import List, Dict, Any, Optional
 import hashlib
 import json
 import surfari.util.db_service as db_service
@@ -248,4 +248,48 @@ class RecordReplayManager:
         normalized = text.strip().encode("utf-8")
         return hashlib.sha256(normalized).hexdigest()[:16]
 
+    def list_recorded_tasks(
+        self,
+        include_chat_history: bool = False,
+        limit: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Return all recorded tasks as a list of dicts ordered by site_name (case-insensitive).
+        Args:
+            include_chat_history: If True, include full chat_history for each task.
+            limit: If provided, restrict the maximum number of rows returned.
+        """
+        columns = [
+            "task_id",
+            "site_id",
+            "site_name",
+            "task_description",
+            "parameterized_task_desc",
+            "created_at",
+        ]
+        if include_chat_history:
+            columns.append("chat_history")
+        select_cols = ", ".join(columns)
+        sql = f"""
+            SELECT {select_cols}
+            FROM replay_tasks
+            ORDER BY site_name COLLATE NOCASE ASC, task_id DESC
+        """
+        if isinstance(limit, int) and limit > 0:
+            sql += f" LIMIT {int(limit)}"
 
+        results: List[Dict[str, Any]] = []
+        with db_service.get_db_connection_sync() as conn:
+            cur = conn.execute(sql)
+            rows = cur.fetchall()
+
+        for r in rows:
+            row = dict(r)
+            if include_chat_history and "chat_history" in row and row["chat_history"]:
+                try:
+                    row["chat_history"] = json.loads(row["chat_history"])
+                except (json.JSONDecodeError, TypeError):
+                    row["chat_history"] = None
+            results.append(row)
+
+        return results
