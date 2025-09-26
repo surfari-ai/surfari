@@ -7,15 +7,14 @@ import os
 import csv
 import sys
 import json
-import surfari.util.config as config
 from surfari.security.site_credential_manager import SiteCredentialManager
 from surfari.util.cdp_browser import BrowserManager
+from surfari.util.electron_connector import send_to_electron, pick_existing_page_for_url
 from surfari.agents.navigation_agent import NavigationAgent
 from surfari.agents.navigation_agent._record_and_replay import RecordReplayManager
 
 import surfari.util.surfari_logger as surfari_logger
 logger = surfari_logger.getLogger(__name__)
-
 
 def parse_args():
     """Parses command line arguments for the runner."""
@@ -54,7 +53,6 @@ def parse_args():
     )
     return parser.parse_args()
 
-
 async def run_single_task(
     task_goal,
     site_name=None,
@@ -89,15 +87,7 @@ async def run_single_task(
     if attach_mode:
         context = manager.browser_context
         logger.info("Attach mode → reusing existing BrowserContext, context has %d pages", len(context.pages))
-        for returnedPage in context.pages:
-            logger.debug("Page has URL: %s (closed=%s))", returnedPage.url, returnedPage.is_closed())
-            if "localhost" in returnedPage.url and "5173" in returnedPage.url:
-                logger.debug("Skipping localhost:5173 page, this is the main window UI")
-                continue
-            page = returnedPage
-            if (returnedPage.url == "about:blank" or returnedPage.url == "chrome://newtab/") and not returnedPage.is_closed():
-                logger.debug("Using this blank page")
-                break
+        page = await pick_existing_page_for_url(context, url)
     else:
         page = await manager.get_new_page()
         
