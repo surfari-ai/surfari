@@ -1,7 +1,7 @@
 {
     "app": {
         "log_level": 20,
-        "log_output": "stdout",
+        "log_output": "stderr",
         "_log_output": "file",
         "project_log_folder": "logs",
         "screenshot_folder": "screenshots",
