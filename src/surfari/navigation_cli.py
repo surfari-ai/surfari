@@ -180,6 +180,7 @@ async def run_batch_csv(csv_path, model, use_system_chrome, num_of_tabs, *, cdp_
 
 
 async def main():
+    logger.emit_event("navigation_cli_start")
     args = parse_args()
     if args.llm_model:
         logger.info(f"Using custom LLM model: {args.llm_model}")
@@ -190,7 +191,7 @@ async def main():
             logging.disable(logging.CRITICAL + 1)  # blocks ALL logging calls
             mgr = RecordReplayManager()
             tasks = mgr.list_recorded_tasks()
-            print(json.dumps(tasks, ensure_ascii=False, indent=2))
+            logger.emit_event("recorded_tasks", tasks=tasks)
             return
 
         if args.batch_file:
