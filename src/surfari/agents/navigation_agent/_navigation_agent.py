@@ -405,7 +405,8 @@ class NavigationAgent(BaseAgent):
 
                 if llm_response_json is None:
                     llm_response_json = {}
-
+                else:
+                    logger.emit_event("llm_response", response=llm_response_json, model=self.model, site_name=self.site_name)
                 # IMPORTANT: Do this before unmasking sensitive info because this is sent back to LLM as history
                 self.chat_history.append({"role": "assistant", "content": json.dumps(llm_response_json or {})})
 
