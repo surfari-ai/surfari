@@ -11,6 +11,10 @@ from google import genai
 from google.genai import types
 from anthropic import Anthropic
 import base64
+import requests
+import secrets
+import hmac
+import hashlib
 
 from surfari.model.tool_helper import (
     _normalize_tools_for_openai,
@@ -249,7 +253,6 @@ class LLMClient:
         logger.sensitive("Rebuilt OpenAI inputs: %s", json.dumps(inputs, indent=2))
         return inputs
 
-
     async def process_prompt_return_json(
         self,
         system_prompt: str = "",
@@ -271,7 +274,20 @@ class LLMClient:
      
         prompt_to_log = system_prompt + json.dumps(chat_history, indent=2) + user_prompt
         await logger.log_text_to_file(site_id, prompt_to_log, purpose, "prompt")
-
+        if config.CONFIG["app"].get("use_llm_proxy", True):
+            result = await self.process_prompt_return_json_via_proxy(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                chat_history=chat_history,
+                image_data=image_data,
+                image_format=image_format,
+                tools=_normalize_tools_for_openai(tools),
+                model=model,
+                purpose=purpose,
+                site_id=site_id
+            )
+            return result
+        
         start = time.time()
         is_open_ai = model.startswith("gpt-") or model == "o3-mini"
         is_gemini_ai = model.startswith("gemini-")
@@ -404,3 +420,113 @@ class LLMClient:
         responsejson = self._parse_llm_response_to_json(responsetxt) if responsetxt else None
         await logger.log_text_to_file(site_id, json.dumps(responsejson, indent=2) if responsejson is not None else "null", purpose, "response")
         return responsejson
+
+    async def process_prompt_return_json_via_proxy(
+        self,
+        system_prompt: str = "",
+        user_prompt: str = "",
+        chat_history: List[Dict[str, str]] = [],
+        image_data: Optional[Union[bytes, str]] = None,
+        image_format: str = "jpeg",
+        tools: Optional[List[Callable[..., Any]]] = None,
+        model: str = "gpt-4.1-mini",
+        purpose: str = "navigation",
+        site_id: int = 0,
+        return_mode: str = "auto",
+        timeout: int = 60
+    ) -> Union[Dict[str, Any], List[Any], None]:
+        """
+        Same interface as process_prompt_return_json(), but delegates to the Surfari model-router API proxy.
+        Signs the payload with HMAC and returns normalized results:
+          - {"tool_calls": [...]}  if tool calls were emitted
+          - {"json": {...}}        if parsed JSON content was returned
+        """
+
+        _ensure_env_loaded()
+
+        # --- Internal helper: safe base64 conversion ---
+        def _ensure_base64(data: Optional[Union[bytes, str]]) -> Optional[str]:
+            if not data:
+                return None
+            if isinstance(data, str):
+                return data  # assume already base64
+            return base64.b64encode(data).decode("ascii")
+
+        # --- Load secrets / config ---
+        proxy_url = os.getenv("SURFARI_PROXY_URL")
+        api_key = os.getenv("SURFARI_API_KEY")
+        signing_secret = os.getenv("SURFARI_SIGNING_SECRET")
+
+        # --- Build request payload ---
+        body_obj = {
+            "model": model,
+            "system_prompt": system_prompt,
+            "user_prompt": user_prompt,
+            "chat_history": chat_history,
+            # Use unified image shape for compatibility with FastAPI schema
+            "image": (
+                {"data_base64": _ensure_base64(image_data), "format": image_format}
+                if image_data else None
+            ),
+            "tools": tools or [],  # ensure list type (avoid 422 errors)
+            "purpose": purpose,
+            "site_id": site_id,
+            "return_mode": return_mode,
+        }
+
+        body_json = json.dumps(body_obj, separators=(",", ":"), ensure_ascii=False)
+        body_bytes = body_json.encode("utf-8")
+
+        # --- Sign the request ---
+        nonce = secrets.token_hex(16)
+        ts = str(int(time.time()))
+        payload = body_bytes + b"|" + nonce.encode() + b"|" + ts.encode()
+        sig = base64.b64encode(
+            hmac.new(signing_secret.encode(), payload, hashlib.sha256).digest()
+        ).decode()
+
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "X-Surfari-Nonce": nonce,
+            "X-Surfari-Timestamp": ts,
+            "X-Surfari-Signature": sig,
+        }
+
+        start = time.time()
+        try:
+            resp = requests.post(proxy_url, headers=headers, data=body_bytes, timeout=timeout)
+        except Exception as e:
+            logger.error(f"Proxy request failed: {e}")
+            raise
+
+        elapsed = time.time() - start
+        logger.info(f"Proxy call to {model} took {elapsed:.2f}s")
+
+        # --- Parse proxy response ---
+        if resp.status_code != 200:
+            logger.error(f"Proxy returned {resp.status_code}: {resp.text}")
+            raise RuntimeError(f"Proxy error {resp.status_code}: {resp.text}")
+
+        try:
+            data = resp.json()
+        except Exception:
+            data = {"raw_text": resp.text}
+
+        await logger.log_text_to_file(site_id, json.dumps(data, indent=2), purpose, "proxy_response")
+
+        # --- Normalize return structure ---
+        tool_calls = data.get("tool_calls")
+        text = data.get("text")
+
+        if tool_calls:
+            # Match non-proxy behavior exactly
+            return {"tool_calls": tool_calls}
+
+        parsed = None
+        if isinstance(text, str):
+            parsed = self._parse_llm_response_to_json(text)
+        elif isinstance(text, (dict, list)):
+            parsed = text
+            
+        return parsed
