@@ -2,8 +2,7 @@
 Minimal sample tools for Surfari's tool-call framework.
 
 - Pass the callables directly to your normalizers:
-    _normalize_tools_for_openai([report_account_details, report_investment_positions])
-    _normalize_tools_for_gemini([report_account_details, report_investment_positions])
+    _normalize_tools([report_account_details, report_investment_positions])
 
 - Each tool:
   * Validates inputs via Pydantic models

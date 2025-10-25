@@ -496,8 +496,8 @@ async def sheets_create_from_json(title: str, records: List[Dict[str, Any]], she
 TOOLS = [gmail_send_email, gmail_search_emails, gmail_get_message, sheets_read_json, sheets_create_from_json]
 
 if __name__ == "__main__":
-    from surfari.model.tool_helper import _normalize_tools_for_openai
+    from surfari.model.tool_helper import _normalize_tools
 
-    normalized = _normalize_tools_for_openai(TOOLS)
+    normalized = _normalize_tools(TOOLS)
     import json
     print(json.dumps(normalized, indent=2))
