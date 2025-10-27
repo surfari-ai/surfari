@@ -35,7 +35,8 @@
         "screenshot_format": "jpeg",
         "screenshot_quality": 30,
         "screenshot_full_page": false,
-        "review_success_iterations": 1
+        "review_success_iterations": 1,
+        "use_llm_proxy": false
     },
     "value_resolver": {
         "target": "surfari.agents.navigation_agent._value_resolver:NoOpResolver",
